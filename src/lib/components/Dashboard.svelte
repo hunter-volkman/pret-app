@@ -16,9 +16,10 @@
     RefreshCw
   } from 'lucide-svelte';
   
-  // Real-time data simulation
+  // Real-time data simulation - more realistic intervals
   let currentTime = new Date();
   let timeInterval: NodeJS.Timeout;
+  let dataInterval: NodeJS.Timeout;
   
   // Mock real-time data
   let storeMetrics = STORE_CONFIGS.map(store => ({
@@ -40,20 +41,28 @@
   
   function updateTime() {
     currentTime = new Date();
+  }
+  
+  function updateData() {
+    // Update data less frequently and with smaller changes
     storeMetrics = storeMetrics.map(store => ({
       ...store,
-      fillPercentage: Math.max(10, store.fillPercentage + (Math.random() - 0.5) * 5),
-      temperature: Math.max(1, Math.min(8, store.temperature + (Math.random() - 0.5) * 0.5)),
-      lastUpdate: Math.random() > 0.8 ? new Date() : store.lastUpdate
+      fillPercentage: Math.max(10, Math.min(100, store.fillPercentage + (Math.random() - 0.5) * 2)),
+      temperature: Math.max(1, Math.min(8, store.temperature + (Math.random() - 0.5) * 0.2)),
+      lastUpdate: Math.random() > 0.9 ? new Date() : store.lastUpdate
     }));
   }
   
   onMount(() => {
-    timeInterval = setInterval(updateTime, 2000);
+    // Update time every second
+    timeInterval = setInterval(updateTime, 1000);
+    // Update data every 30 seconds (more realistic)
+    dataInterval = setInterval(updateData, 30000);
   });
   
   onDestroy(() => {
     if (timeInterval) clearInterval(timeInterval);
+    if (dataInterval) clearInterval(dataInterval);
   });
   
   function getStatusColor(status: string) {
