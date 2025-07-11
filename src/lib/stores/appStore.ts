@@ -1,210 +1,98 @@
-import { writable, derived, get } from 'svelte/store';
+import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
-import type { StoreLocation, Alert, TemperatureSensor, AppState } from '$lib/types';
-import { STORE_CONFIGS } from '$lib/services/viamConfig';
+import { getViamCredentials, saveViamCredentials } from '$lib/services/viamAuth';
+import type { StoreLocation } from '$lib/types';
 
-// Core app state
-export const selectedStores = writable<Set<string>>(new Set(['store-5th-ave', 'store-union-sq']));
-export const currentView = writable<AppState['currentView']>('overview');
-export const stores = writable<StoreLocation[]>(STORE_CONFIGS);
-export const alerts = writable<Alert[]>([]);
-export const temperatureData = writable<Map<string, TemperatureSensor[]>>(new Map());
+// Store configurations - these will be filtered based on actual machine access
+const ALL_STORE_CONFIGS: StoreLocation[] = [
+  {
+    id: 'store-5th-ave',
+    name: '5th Avenue',
+    address: '389 5th Ave, New York, NY 10016',
+    coords: { lat: 40.7516, lng: -73.9755 },
+    partId: 'a7c5717d-f48e-4ac8-b179-7c7aa73571de',
+    status: 'offline',
+    region: 'Manhattan',
+    capabilities: { hasCamera: true, hasCVCamera: true, sensorCount: 9 },
+  },
+  {
+    id: 'store-union-sq',
+    name: 'Union Square', 
+    address: '31 E 14th St, New York, NY 10003',
+    coords: { lat: 40.7359, lng: -73.9911 },
+    partId: 'demo-machine-union-sq',
+    status: 'offline',
+    region: 'Manhattan',
+    capabilities: { hasCamera: true, hasCVCamera: true, sensorCount: 11 },
+  },
+  {
+    id: 'store-times-sq',
+    name: 'Times Square',
+    address: '1500 Broadway, New York, NY 10036', 
+    coords: { lat: 40.7589, lng: -73.9851 },
+    partId: 'demo-machine-times-sq',
+    status: 'offline',
+    region: 'Manhattan',
+    capabilities: { hasCamera: false, hasCVCamera: false, sensorCount: 0 },
+  },
+];
 
-// Notification state
-export const notifications = writable<AppState['notifications']>({
-  enabled: false,
-  permission: 'default',
-  subscriptions: []
-});
+// Stores
+export const selectedStores = writable<Set<string>>(new Set());
+export const stores = writable<StoreLocation[]>([]);
+export const selectedStoreData = writable<StoreLocation[]>([]);
 
-// Derived stores for computed values
-export const selectedStoreData = derived(
-  [stores, selectedStores],
-  ([storesData, selected]) => storesData.filter(store => selected.has(store.id))
-);
-
-export const onlineStores = derived(
-  selectedStoreData,
-  ($selectedStoreData) => $selectedStoreData.filter(store => store.status === 'online')
-);
-
-export const unreadAlerts = derived(
-  alerts,
-  ($alerts) => $alerts.filter(alert => !alert.read)
-);
-
-export const criticalAlerts = derived(
-  unreadAlerts,
-  ($unreadAlerts) => $unreadAlerts.filter(alert => alert.severity === 'critical')
-);
-
-// Viam credentials
 export const viamCredentials = writable<{
   apiKeyId: string;
   apiKey: string;
+  hostname: string;
+  machineId: string;
   isConfigured: boolean;
 }>({
   apiKeyId: '',
   apiKey: '',
+  hostname: '',
+  machineId: '',
   isConfigured: false
 });
 
-// Store actions
+// Actions
 export const storeActions = {
-  toggleStoreSelection: (storeId: string) => {
-    selectedStores.update(selected => {
-      const newSelected = new Set(selected);
-      if (newSelected.has(storeId)) {
-        newSelected.delete(storeId);
-      } else {
-        newSelected.add(storeId);
-      }
-      return newSelected;
-    });
-  },
-
-  updateStoreStatus: (storeId: string, status: StoreLocation['status']) => {
-    stores.update(storesData => 
-      storesData.map(store => 
-        store.id === storeId ? { ...store, status } : store
-      )
-    );
-  },
-
-  addAlert: (alert: Alert) => {
-    alerts.update(alertsData => [alert, ...alertsData.slice(0, 99)]);
-    updateNotificationBadge();
-  },
-
-  markAlertRead: (alertId: string) => {
-    alerts.update(alertsData => 
-      alertsData.map(alert => 
-        alert.id === alertId ? { ...alert, read: true } : alert
-      )
-    );
-    updateNotificationBadge();
-  },
-
-  markAllAlertsRead: () => {
-    alerts.update(alertsData => 
-      alertsData.map(alert => ({ ...alert, read: true }))
-    );
-    updateNotificationBadge();
-  },
-
-  acknowledgeAlert: (alertId: string) => {
-    alerts.update(alertsData => 
-      alertsData.map(alert => 
-        alert.id === alertId 
-          ? { ...alert, acknowledged: true, read: true }
-          : alert
-      )
-    );
-    updateNotificationBadge();
-  },
-
-  updateTemperatureData: (storeId: string, sensors: TemperatureSensor[]) => {
-    temperatureData.update(tempData => {
-      const newData = new Map(tempData);
-      newData.set(storeId, sensors);
-      return newData;
-    });
-  },
-
-  configureViam: (apiKeyId: string, apiKey: string) => {
+  configureViam: (apiKeyId: string, apiKey: string, hostname?: string) => {
     viamCredentials.set({
       apiKeyId,
       apiKey,
+      hostname: hostname || '',
+      machineId: '',
       isConfigured: true
     });
     
-    // Save to localStorage
     if (browser) {
-      localStorage.setItem('viam-credentials', JSON.stringify({
-        apiKeyId,
-        apiKey,
-        isConfigured: true
-      }));
+      saveViamCredentials(apiKeyId, apiKey, hostname);
     }
-  }
-};
-
-// Notification actions
-export const notificationActions = {
-  requestPermission: async (): Promise<boolean> => {
-    if (!browser || !('Notification' in window)) return false;
-    
-    const permission = await Notification.requestPermission();
-    notifications.update(state => ({
-      ...state,
-      permission,
-      enabled: permission === 'granted'
-    }));
-    
-    return permission === 'granted';
   },
-
-  enableNotifications: async (): Promise<boolean> => {
-    const granted = await notificationActions.requestPermission();
-    if (granted) {
-      notifications.update(state => ({ ...state, enabled: true }));
-    }
-    return granted;
-  },
-
-  disableNotifications: () => {
-    notifications.update(state => ({ ...state, enabled: false }));
-  },
-
-  subscribeToStore: (storeId: string) => {
-    notifications.update(state => ({
-      ...state,
-      subscriptions: [...new Set([...state.subscriptions, storeId])]
-    }));
-  },
-
-  unsubscribeFromStore: (storeId: string) => {
-    notifications.update(state => ({
-      ...state,
-      subscriptions: state.subscriptions.filter(id => id !== storeId)
-    }));
-  }
-};
-
-// Update notification badge
-function updateNotificationBadge() {
-  if (!browser) return;
   
-  const unreadCount = get(unreadAlerts).length;
-  
-  if ('setAppBadge' in navigator) {
-    if (unreadCount > 0) {
-      navigator.setAppBadge(unreadCount);
-    } else {
-      navigator.clearAppBadge();
-    }
-  }
-}
-
-// Initialize from localStorage
-if (browser) {
-  try {
-    const stored = localStorage.getItem('viam-credentials');
-    if (stored) {
-      const credentials = JSON.parse(stored);
+  initializeFromCookies: () => {
+    if (browser) {
+      const credentials = getViamCredentials();
       viamCredentials.set(credentials);
+      
+      // Filter stores based on available machine
+      if (credentials.machineId) {
+        const availableStore = ALL_STORE_CONFIGS.find(store => 
+          store.partId === credentials.machineId
+        );
+        if (availableStore) {
+          stores.set([availableStore]);
+          selectedStores.set(new Set([availableStore.id]));
+          selectedStoreData.set([availableStore]);
+        }
+      } else {
+        // Local development - show all stores
+        stores.set(ALL_STORE_CONFIGS);
+        selectedStores.set(new Set(['store-5th-ave']));
+        selectedStoreData.set(ALL_STORE_CONFIGS);
+      }
     }
-
-    const storedSelected = localStorage.getItem('selected-stores');
-    if (storedSelected) {
-      selectedStores.set(new Set(JSON.parse(storedSelected)));
-    }
-  } catch (error) {
-    console.warn('Failed to load from localStorage:', error);
   }
-
-  // Save selected stores to localStorage
-  selectedStores.subscribe(selected => {
-    localStorage.setItem('selected-stores', JSON.stringify(Array.from(selected)));
-  });
-}
+};
