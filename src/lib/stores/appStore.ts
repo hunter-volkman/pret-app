@@ -1,98 +1,95 @@
-import { writable } from 'svelte/store';
-import { browser } from '$app/environment';
-import { getViamCredentials, saveViamCredentials } from '$lib/services/viamAuth';
-import type { StoreLocation } from '$lib/types';
+import { create } from 'zustand'
+import { subscribeWithSelector } from 'zustand/middleware'
+import type { StoreLocation, AlertData } from '../types'
 
-// Store configurations - these will be filtered based on actual machine access
-const ALL_STORE_CONFIGS: StoreLocation[] = [
-  {
-    id: 'store-5th-ave',
-    name: '5th Avenue',
-    address: '389 5th Ave, New York, NY 10016',
-    coords: { lat: 40.7516, lng: -73.9755 },
-    partId: 'a7c5717d-f48e-4ac8-b179-7c7aa73571de',
-    status: 'offline',
-    region: 'Manhattan',
-    capabilities: { hasCamera: true, hasCVCamera: true, sensorCount: 9 },
-  },
-  {
-    id: 'store-union-sq',
-    name: 'Union Square', 
-    address: '31 E 14th St, New York, NY 10003',
-    coords: { lat: 40.7359, lng: -73.9911 },
-    partId: 'demo-machine-union-sq',
-    status: 'offline',
-    region: 'Manhattan',
-    capabilities: { hasCamera: true, hasCVCamera: true, sensorCount: 11 },
-  },
-  {
-    id: 'store-times-sq',
-    name: 'Times Square',
-    address: '1500 Broadway, New York, NY 10036', 
-    coords: { lat: 40.7589, lng: -73.9851 },
-    partId: 'demo-machine-times-sq',
-    status: 'offline',
-    region: 'Manhattan',
-    capabilities: { hasCamera: false, hasCVCamera: false, sensorCount: 0 },
-  },
-];
-
-// Stores
-export const selectedStores = writable<Set<string>>(new Set());
-export const stores = writable<StoreLocation[]>([]);
-export const selectedStoreData = writable<StoreLocation[]>([]);
-
-export const viamCredentials = writable<{
-  apiKeyId: string;
-  apiKey: string;
-  hostname: string;
-  machineId: string;
-  isConfigured: boolean;
-}>({
-  apiKeyId: '',
-  apiKey: '',
-  hostname: '',
-  machineId: '',
-  isConfigured: false
-});
-
-// Actions
-export const storeActions = {
-  configureViam: (apiKeyId: string, apiKey: string, hostname?: string) => {
-    viamCredentials.set({
-      apiKeyId,
-      apiKey,
-      hostname: hostname || '',
-      machineId: '',
-      isConfigured: true
-    });
-    
-    if (browser) {
-      saveViamCredentials(apiKeyId, apiKey, hostname);
-    }
-  },
+interface AppState {
+  // Store data
+  stores: StoreLocation[]
+  selectedStores: Set<string>
+  currentStore: StoreLocation | null
   
-  initializeFromCookies: () => {
-    if (browser) {
-      const credentials = getViamCredentials();
-      viamCredentials.set(credentials);
-      
-      // Filter stores based on available machine
-      if (credentials.machineId) {
-        const availableStore = ALL_STORE_CONFIGS.find(store => 
-          store.partId === credentials.machineId
-        );
-        if (availableStore) {
-          stores.set([availableStore]);
-          selectedStores.set(new Set([availableStore.id]));
-          selectedStoreData.set([availableStore]);
-        }
+  // Alerts
+  alerts: AlertData[]
+  unreadCount: number
+  
+  // UI state
+  currentView: 'stores' | 'alerts' | 'camera'
+  isLoading: boolean
+  
+  // Real-time data
+  lastDataUpdate: Date | null
+  
+  // Actions
+  setStores: (stores: StoreLocation[]) => void
+  updateStore: (storeId: string, updates: Partial<StoreLocation>) => void
+  toggleStoreSelection: (storeId: string) => void
+  setCurrentStore: (store: StoreLocation | null) => void
+  setCurrentView: (view: 'stores' | 'alerts' | 'camera') => void
+  addAlert: (alert: AlertData) => void
+  markAlertRead: (alertId: string) => void
+  markAllAlertsRead: () => void
+  setLoading: (loading: boolean) => void
+  updateLastDataUpdate: () => void
+}
+
+export const useAppStore = create<AppState>()(
+  subscribeWithSelector((set, get) => ({
+    // Initial state
+    stores: [],
+    selectedStores: new Set(),
+    currentStore: null,
+    alerts: [],
+    unreadCount: 0,
+    currentView: 'stores',
+    isLoading: false,
+    lastDataUpdate: null,
+
+    // Actions
+    setStores: (stores) => set({ stores }),
+    
+    updateStore: (storeId, updates) => set((state) => ({
+      stores: state.stores.map(store => 
+        store.id === storeId ? { ...store, ...updates, lastUpdate: new Date() } : store
+      )
+    })),
+
+    toggleStoreSelection: (storeId) => set((state) => {
+      const newSelected = new Set(state.selectedStores)
+      if (newSelected.has(storeId)) {
+        newSelected.delete(storeId)
       } else {
-        // Local development - show all stores
-        stores.set(ALL_STORE_CONFIGS);
-        selectedStores.set(new Set(['store-5th-ave']));
-        selectedStoreData.set(ALL_STORE_CONFIGS);
+        newSelected.add(storeId)
       }
-    }
-  }
-};
+      
+      // Save to localStorage
+      localStorage.setItem('pret-selected-stores', JSON.stringify([...newSelected]))
+      
+      return { selectedStores: newSelected }
+    }),
+
+    setCurrentStore: (store) => set({ currentStore: store }),
+    setCurrentView: (view) => set({ currentView: view }),
+
+    addAlert: (alert) => set((state) => {
+      const newAlerts = [alert, ...state.alerts.slice(0, 49)] // Keep only 50 most recent
+      const unreadCount = newAlerts.filter(a => !a.read).length
+      return { alerts: newAlerts, unreadCount }
+    }),
+
+    markAlertRead: (alertId) => set((state) => {
+      const newAlerts = state.alerts.map(alert =>
+        alert.id === alertId ? { ...alert, read: true } : alert
+      )
+      const unreadCount = newAlerts.filter(a => !a.read).length
+      return { alerts: newAlerts, unreadCount }
+    }),
+
+    markAllAlertsRead: () => set((state) => {
+      const newAlerts = state.alerts.map(alert => ({ ...alert, read: true }))
+      return { alerts: newAlerts, unreadCount: 0 }
+    }),
+
+    setLoading: (loading) => set({ isLoading: loading }),
+    updateLastDataUpdate: () => set({ lastDataUpdate: new Date() })
+  }))
+)
