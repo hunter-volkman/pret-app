@@ -1,0 +1,13 @@
+{
+  "module_id": "yournamespace:pret-monitor",
+  "visibility": "public",
+  "url": "https://github.com/hunter-volkman/viam-pret-app",
+  "description": "Real-time inventory and temperature monitoring for Pret A Manger stores",
+  "applications": [
+    {
+      "name": "app",
+      "type": "single_machine",
+      "entrypoint": "build/index.html"
+    }
+  ]
+}
