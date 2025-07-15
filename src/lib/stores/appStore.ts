@@ -16,9 +16,6 @@ interface AppState {
   currentView: 'stores' | 'alerts' | 'camera'
   isLoading: boolean
   
-  // Real-time data
-  lastDataUpdate: Date | null
-  
   // Actions
   setStores: (stores: StoreLocation[]) => void
   updateStore: (storeId: string, updates: Partial<StoreLocation>) => void
@@ -29,7 +26,6 @@ interface AppState {
   markAlertRead: (alertId: string) => void
   markAllAlertsRead: () => void
   setLoading: (loading: boolean) => void
-  updateLastDataUpdate: () => void
 }
 
 export const useAppStore = create<AppState>()(
@@ -42,7 +38,6 @@ export const useAppStore = create<AppState>()(
     unreadCount: 0,
     currentView: 'stores',
     isLoading: false,
-    lastDataUpdate: null,
 
     // Actions
     setStores: (stores) => set({ stores }),
@@ -62,7 +57,11 @@ export const useAppStore = create<AppState>()(
       }
       
       // Save to localStorage
-      localStorage.setItem('pret-selected-stores', JSON.stringify([...newSelected]))
+      try {
+        localStorage.setItem('pret-selected-stores', JSON.stringify([...newSelected]))
+      } catch (error) {
+        console.warn('Failed to save store selections:', error)
+      }
       
       return { selectedStores: newSelected }
     }),
@@ -89,7 +88,6 @@ export const useAppStore = create<AppState>()(
       return { alerts: newAlerts, unreadCount: 0 }
     }),
 
-    setLoading: (loading) => set({ isLoading: loading }),
-    updateLastDataUpdate: () => set({ lastDataUpdate: new Date() })
+    setLoading: (loading) => set({ isLoading: loading })
   }))
 )
