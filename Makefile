@@ -1,7 +1,7 @@
 .PHONY: create update upload build deploy
 
 VERSION := 1.0.0
-MODULE_NAME := pret-monitor
+MODULE_NAME := app
 ORG_PUBLIC_NAMESPACE := yournamespace
 
 create:
