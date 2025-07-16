@@ -1,116 +1,81 @@
 import React, { useEffect } from 'react'
-import { useAppStore } from './lib/stores/appStore'
-import { pushNotificationService } from './lib/services/pushNotificationService'
-import { STORE_CONFIGS } from './lib/services/viamConfig'
-import Header from './lib/components/Header'
-import StoresView from './lib/components/StoresView'
-import AlertsView from './lib/components/AlertsView'
-import CameraView from './lib/components/CameraView'
-import Navigation from './lib/components/Navigation'
+import { useStore } from './stores/store'
+import { monitor } from './services/monitor'
+import { IS_DEMO, toggleDemo } from './config/stores'
+
+// Components
+import { Header } from './components/Header'
+import { StoresView } from './components/StoresView'
+import { AlertsView } from './components/AlertsView'
+import { CameraView } from './components/CameraView'
+import { Navigation } from './components/Navigation'
+import { Settings } from 'lucide-react'
 
 function App() {
-  const { 
-    currentView, 
-    setStores, 
-    selectedStores, 
-    toggleStoreSelection,
-    addAlert
-  } = useAppStore()
-
+  const { currentView, selectedStores, stores, toggleStoreSelection } = useStore()
+  const [showSettings, setShowSettings] = React.useState(false)
+  
+  // Auto-select all stores in demo mode for immediate data
   useEffect(() => {
-    // Initialize push notifications
-    pushNotificationService.initialize().then(success => {
-      if (success) {
-        console.log('Push notifications ready')
-      }
-    })
-
-    // Initialize stores with mock data
-    const mockStores = STORE_CONFIGS.map(store => ({
-      ...store,
-      status: Math.random() > 0.7 ? 'offline' : 'online' as const,
-      fillPercentage: Math.floor(Math.random() * 40) + 60,
-      temperature: 2 + Math.random() * 4,
-      lastUpdate: new Date(Date.now() - Math.random() * 600000),
-      alertCount: Math.floor(Math.random() * 3),
-      dailyTransactions: Math.floor(Math.random() * 500) + 200
-    }))
-    
-    setStores(mockStores)
-
-    // Add some mock alerts
-    const mockAlerts = [
-      {
-        id: '1',
-        storeId: 'store-5th-ave',
-        storeName: '5th Avenue',
-        type: 'empty_shelf' as const,
-        title: 'Low Stock Alert',
-        message: 'Sandwich section needs restocking',
-        timestamp: new Date(Date.now() - 300000),
-        read: false,
-        severity: 'high' as const
-      },
-      {
-        id: '2',
-        storeId: 'store-times-sq',
-        storeName: 'Times Square',
-        type: 'temperature' as const,
-        title: 'Temperature Warning',
-        message: 'Refrigerator temperature above normal',
-        timestamp: new Date(Date.now() - 900000),
-        read: false,
-        severity: 'medium' as const
-      }
-    ]
-    
-    mockAlerts.forEach(alert => addAlert(alert))
-
-    // Load saved store selections
-    try {
-      const saved = localStorage.getItem('pret-selected-stores')
-      if (saved) {
-        const storeIds = JSON.parse(saved)
-        storeIds.forEach((id: string) => toggleStoreSelection(id))
-      } else {
-        // Select first two stores by default
-        mockStores.slice(0, 2).forEach(store => toggleStoreSelection(store.id))
-      }
-    } catch (error) {
-      console.warn('Failed to load saved store selections:', error)
+    if (IS_DEMO && selectedStores.size === 0 && stores.length > 0) {
+      stores.forEach(store => {
+        toggleStoreSelection(store.id)
+      })
     }
-
-    // Simulate real-time updates
-    const interval = setInterval(() => {
-      // Simulate random stock level changes
-      const selectedStoreIds = Array.from(selectedStores)
-      if (selectedStoreIds.length > 0) {
-        const randomStoreId = selectedStoreIds[Math.floor(Math.random() * selectedStoreIds.length)]
-        const randomLevel = Math.floor(Math.random() * 100)
-        
-        if (randomLevel < 20) {
-          pushNotificationService.sendStockAlert(
-            mockStores.find(s => s.id === randomStoreId)?.name || 'Store',
-            'Sandwiches',
-            randomLevel
-          )
-        }
-      }
-    }, 30000) // Every 30 seconds
-
-    return () => clearInterval(interval)
-  }, [])
+  }, [stores, selectedStores, toggleStoreSelection])
+  
+  // Start monitoring when stores are selected
+  useEffect(() => {
+    if (selectedStores.size > 0) {
+      monitor.start(selectedStores)
+    } else {
+      monitor.stop()
+    }
+    
+    return () => monitor.stop()
+  }, [selectedStores])
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
       
+      {/* Settings Button */}
+      <div className="fixed top-4 right-4 z-50">
+        <button
+          onClick={() => setShowSettings(!showSettings)}
+          className="p-2 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50"
+        >
+          <Settings className="w-5 h-5 text-gray-600" />
+        </button>
+      </div>
+      
+      {/* Settings Panel */}
+      {showSettings && (
+        <>
+          <div className="fixed top-16 right-4 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50 min-w-[200px]">
+            <h3 className="font-semibold text-gray-900 mb-3">Settings</h3>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Demo Mode</span>
+              <button
+                onClick={toggleDemo}
+                className={`px-3 py-1 text-xs rounded-full ${
+                  IS_DEMO ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                }`}
+              >
+                {IS_DEMO ? 'ON' : 'OFF'}
+              </button>
+            </div>
+          </div>
+          <div className="fixed inset-0 z-40" onClick={() => setShowSettings(false)} />
+        </>
+      )}
+
       <main className="pb-20">
         {currentView === 'stores' && <StoresView />}
         {currentView === 'alerts' && <AlertsView />}
         {currentView === 'camera' && <CameraView />}
       </main>
-      
+
       <Navigation />
     </div>
   )
