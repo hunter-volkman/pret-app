@@ -1,22 +1,42 @@
-.PHONY: create update upload build deploy
+.PHONY: create update upload build deploy clean dev
 
 VERSION := 1.0.0
-MODULE_NAME := app
-ORG_PUBLIC_NAMESPACE := yournamespace
+MODULE_NAME := inventorymonitor
+ORG_PUBLIC_NAMESPACE := pret
 
-create:
-	viam module create --name=${MODULE_NAME} --public-namespace=${ORG_PUBLIC_NAMESPACE}
+# Development
+dev:
+	npm run dev
 
-update:
-	viam module update --module=meta.json
-
+# Build production version
 build:
 	npm run build
 
-deploy: build
-	tar -czvf module.tar.gz build meta.json
-	viam module upload --version=${VERSION} --platform=any --public-namespace=${ORG_PUBLIC_NAMESPACE} --force module
+# Create Viam module (run once)
+create:
+	viam module create --name=${MODULE_NAME} --public-namespace=${ORG_PUBLIC_NAMESPACE}
 
+# Update module metadata
+update:
+	viam module update --module=meta.json
+
+# Deploy to Viam Apps
+deploy: build
+	tar -czvf pret-inventorymonitor.tar.gz build meta.json
+	viam module upload --version=${VERSION} --platform=any --public-namespace=${ORG_PUBLIC_NAMESPACE} --force pret-inventorymonitor.tar.gz
+	@echo "Deployed to: https://inventorymonitor_${ORG_PUBLIC_NAMESPACE}.viamapplications.com"
+
+# Clean build artifacts
 clean:
-	rm -f module.tar.gz
+	rm -f pret-inventorymonitor.tar.gz
 	rm -rf build
+
+# Install dependencies
+install:
+	npm install
+
+# Full setup for new environment
+setup: install create
+
+# Quick redeploy
+redeploy: clean deploy
