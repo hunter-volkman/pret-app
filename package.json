@@ -1,12 +1,12 @@
 {
-  "name": "app",
+  "name": "pret-inventorymonitor",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "deploy": "npm run build && tar -czvf app.tar.gz build meta.json && echo 'Ready to upload: app.tar.gz'"
+    "deploy": "npm run build && tar -czvf pret-inventorymonitor.tar.gz build meta.json && echo 'Ready to upload: pret-inventorymonitor.tar.gz'"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -24,6 +24,7 @@
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.3.6",
+    "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.2.2",
     "vite": "^5.0.8"
   }
