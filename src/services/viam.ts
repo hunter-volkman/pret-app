@@ -115,15 +115,11 @@ class ViamService {
     const client = await this.connect(machineId);
     if (!client) return [];
     try {
-      const resources = await client.resourceNames();
-      const gateway = resources.find(r => r && r.api && r.api.endsWith(':sensor') && r.model && !r.model.includes('stock-fill'));
-      if (!gateway) {
-        console.error("Could not find a temperature sensor component on machine " + machineId);
-        return [];
-      }
-      console.log(`[ViamService] Found temperature sensor "${gateway.name}" on ${machineId}`);
-      const sensor = new VIAM.SensorClient(client, gateway.name);
+      // The gateway component is always named "gateway"
+      const sensor = new VIAM.SensorClient(client, 'gateway');
       const readings = await sensor.getReadings();
+
+      // Iterate through the map of sensor data from the gateway
       return Object.entries(readings).map(([id, data]: [string, any]) => ({
         id,
         name: this.getSensorName(id),
