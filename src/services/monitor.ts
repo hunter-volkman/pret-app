@@ -1,5 +1,5 @@
 import { viam } from './viam'
-import { useStore } from '../stores/store'
+import { useStore, Alert } from '../stores/store'
 import { STORES, IS_DEMO } from '../config/stores'
 
 class MonitorService {
@@ -71,9 +71,13 @@ class MonitorService {
       );
       
       if (!hasRecentStockAlert) {
-        // ✅ FIX: Get a real camera image for the alert
-        console.log(`[Monitor] Generating stock alert for ${store.name}. Fetching snapshot...`);
-        const imageUrl = await viam.getCameraImage(store.stockMachineId, true); // Get overlay view
+        console.log(`[Monitor] Generating stock alert for ${store.name}. Fetching snapshots...`);
+        
+        // ✅ CHANGE: Fetch both raw and CV images concurrently for performance.
+        const [imageUrl, cvImageUrl] = await Promise.all([
+          viam.getCameraImage(store.stockMachineId, false), // Raw feed
+          viam.getCameraImage(store.stockMachineId, true)   // CV overlay
+        ]);
 
         addAlert({
           id: `stock-${store.id}-${Date.now()}`,
@@ -86,7 +90,9 @@ class MonitorService {
           severity: lowStock.some(r => r.status === 'empty') ? 'high' : 'medium',
           read: false,
           regions: lowStock.map(r => r.id),
-          imageUrl: imageUrl || undefined // Use real image URL
+          // ✅ CHANGE: Store both image URLs in the alert object.
+          imageUrl: imageUrl || undefined,
+          cvImageUrl: cvImageUrl || undefined
         });
       }
     }

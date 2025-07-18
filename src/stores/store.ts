@@ -17,7 +17,7 @@ interface TempSensor {
   status: 'normal' | 'warning' | 'critical'
 }
 
-interface Alert {
+export interface Alert {
   id: string
   storeId: string
   storeName: string
@@ -30,6 +30,8 @@ interface Alert {
   regions?: string[]
   sensors?: string[]
   imageUrl?: string
+  // ✅ ADDITION: Add a field for the CV overlay snapshot
+  cvImageUrl?: string
 }
 
 interface StoreData {
@@ -40,7 +42,6 @@ interface StoreData {
   stockRegions: StockRegion[]
   tempSensors: TempSensor[]
   lastUpdate?: Date
-  // ✅ FIX: Add machine IDs to the state interface
   stockMachineId: string
   tempMachineId: string
 }
@@ -70,7 +71,6 @@ export const useStore = create<AppState>((set, get) => ({
     status: 'offline',
     stockRegions: [],
     tempSensors: [],
-    // ✅ FIX: Initialize state with the machine IDs from config
     stockMachineId: store.stockMachineId,
     tempMachineId: store.tempMachineId
   })),
