@@ -1,5 +1,5 @@
 import React from 'react'
-import { Home, Bell, Camera } from 'lucide-react'
+import { Home, Bell, Camera, Map } from 'lucide-react'
 import { useStore, unreadCount } from '../stores/store'
 
 export function Navigation() {
@@ -7,10 +7,11 @@ export function Navigation() {
   const alertCount = unreadCount()
   
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 z-50">
       <div className="flex items-center justify-around max-w-md mx-auto">
         {[
           { id: 'stores', icon: Home, label: 'Stores' },
+          { id: 'map', icon: Map, label: 'Map' },
           { id: 'alerts', icon: Bell, label: 'Alerts', badge: alertCount },
           { id: 'camera', icon: Camera, label: 'Camera' }
         ].map(item => {
@@ -21,7 +22,7 @@ export function Navigation() {
             <button
               key={item.id}
               onClick={() => setCurrentView(item.id as any)}
-              className={`flex flex-col items-center py-2 px-4 rounded-lg transition-colors ${
+              className={`flex flex-col items-center py-2 px-4 rounded-lg transition-colors w-20 ${
                 isActive ? 'text-blue-600 bg-blue-50' : 'text-gray-500'
               }`}
             >
