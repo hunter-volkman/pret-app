@@ -1,15 +1,13 @@
 import { viam } from './viam'
-import { useStore, Alert } from '../stores/store'
-import { STORES, IS_DEMO } from '../config/stores'
+import { useStore } from '../stores/store'
+import { STORES } from '../config/stores'
+import { Store } from '../config/stores'
 
 class MonitorService {
   private intervals = new Map<string, NodeJS.Timeout>()
-  private isRunning = false
 
-  start(selectedStores: Set<string>) {
+  public start(selectedStores: Set<string>): void {
     this.stop()
-    this.isRunning = true
-    
     for (const storeId of selectedStores) {
       const store = STORES.find(s => s.id === storeId)
       if (!store) {
@@ -23,28 +21,21 @@ class MonitorService {
     }
   }
 
-  stop() {
-    this.isRunning = false
+  public stop(): void {
     this.intervals.forEach(interval => clearInterval(interval))
     this.intervals.clear()
   }
 
-  private async pollStore(store: any) {
-    if (!this.isRunning) return;
-
+  private async pollStore(store: Store): Promise<void> {
     try {
-      if (IS_DEMO) {
-        // Demo data logic remains the same
-      } else {
-        await this.updateWithRealData(store);
-      }
+      await this.updateWithRealData(store);
     } catch (error) {
       console.error(`Polling failed for ${store.name}:`, error)
       useStore.getState().updateStore(store.id, { status: 'offline' })
     }
   }
 
-  private async updateWithRealData(store: any) {
+  private async updateWithRealData(store: Store): Promise<void> {
     const [stockRegions, tempSensors] = await Promise.all([
       viam.getStockReadings(store.stockMachineId),
       viam.getTemperatureReadings(store.tempMachineId)
@@ -59,9 +50,10 @@ class MonitorService {
     this.checkAlerts(store, stockRegions, tempSensors);
   }
   
-  private async checkAlerts(store: any, stockRegions: any[], tempSensors: any[]) {
+  private async checkAlerts(store: Store, stockRegions: any[], tempSensors: any[]): Promise<void> {
     const { alerts, addAlert } = useStore.getState();
-    const recentAlertCutoff = Date.now() - (5 * 60 * 1000); // 5 minutes
+    // Prevent alert spam by only creating one of each type per 5-minute window
+    const recentAlertCutoff = Date.now() - (5 * 60 * 1000);
 
     // Stock alerts
     const lowStock = stockRegions.filter(r => r.status === 'empty' || r.status === 'low');
@@ -71,12 +63,10 @@ class MonitorService {
       );
       
       if (!hasRecentStockAlert) {
-        console.log(`[Monitor] Generating stock alert for ${store.name}. Fetching snapshots...`);
-        
-        // ✅ CHANGE: Fetch both raw and CV images concurrently for performance.
+        // Fetch both raw and CV images concurrently for performance
         const [imageUrl, cvImageUrl] = await Promise.all([
-          viam.getCameraImage(store.stockMachineId, false), // Raw feed
-          viam.getCameraImage(store.stockMachineId, true)   // CV overlay
+          viam.getCameraImage(store.stockMachineId, false),
+          viam.getCameraImage(store.stockMachineId, true)
         ]);
 
         addAlert({
@@ -85,12 +75,11 @@ class MonitorService {
           storeName: store.name,
           type: 'stock',
           title: 'Low Stock Alert',
-          message: `${lowStock.length} regions need immediate restocking`,
+          message: `${lowStock.length} regions need immediate restocking at ${store.name}.`,
           timestamp: new Date(),
           severity: lowStock.some(r => r.status === 'empty') ? 'high' : 'medium',
           read: false,
           regions: lowStock.map(r => r.id),
-          // ✅ CHANGE: Store both image URLs in the alert object.
           imageUrl: imageUrl || undefined,
           cvImageUrl: cvImageUrl || undefined
         });
@@ -112,9 +101,7 @@ class MonitorService {
           storeName: store.name,
           type: 'temperature',
           title: 'Temperature Alert',
-          message: criticalIssues.length > 0 
-            ? `Critical temperature issue in ${criticalIssues[0].name}` 
-            : `Temperature warning in ${tempIssues[0].name}`,
+          message: `Temperature issue detected in ${tempIssues[0].name} at ${store.name}.`,
           timestamp: new Date(),
           severity: criticalIssues.length > 0 ? 'high' : 'medium',
           read: false,
@@ -125,4 +112,4 @@ class MonitorService {
   }
 }
 
-export const monitor = new MonitorService()
+export const monitor = new MonitorService();
