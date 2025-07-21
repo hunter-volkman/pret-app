@@ -1,38 +1,42 @@
-import React, { useState } from 'react'
-import { ChevronDown, ChevronUp, MapPin, Thermometer, Activity, Wifi, WifiOff, AlertCircle } from 'lucide-react'
-import { useStore } from '../stores/store'
+import React, { useState } from 'react';
+import { ChevronDown, MapPin, Thermometer, Activity, Wifi, WifiOff, AlertCircle, Bell, BellOff } from 'lucide-react';
+import { useStore, StoreData } from '../stores/store';
 
-interface StockRegion { id: string; name: string; fillLevel: number; status: 'ok' | 'low' | 'empty' }
-interface TempSensor { id: string; name: string; temperature: number; status: 'normal' | 'warning' | 'critical' }
-interface StoreData { id: string; name: string; address: string; status: 'online' | 'offline'; stockRegions: StockRegion[]; tempSensors: TempSensor[]; stockMachineId: string; tempMachineId: string; }
-interface StoreCardProps { store: StoreData; isSelected: boolean; onToggle: () => void; onClick: () => void; }
-
-const getFillColor = (status: StockRegion['status']) => {
+const getFillColor = (status: 'ok' | 'low' | 'empty') => {
   switch (status) {
     case 'ok': return 'bg-green-100 text-green-800';
     case 'low': return 'bg-yellow-100 text-yellow-800';
     case 'empty': return 'bg-red-100 text-red-800';
     default: return 'bg-gray-100 text-gray-800';
   }
-}
+};
 
-const getTempColor = (status: TempSensor['status']) => {
+const getTempColor = (status: 'normal' | 'warning' | 'critical') => {
   switch (status) {
     case 'normal': return 'text-green-600';
     case 'warning': return 'text-yellow-600';
     case 'critical': return 'text-red-600';
     default: return 'text-gray-600';
   }
+};
+
+interface StoreCardProps {
+  store: StoreData;
+  isSelected: boolean;
+  onToggle: () => void;
+  onClick: () => void;
 }
 
 export function StoreCard({ store, isSelected, onToggle, onClick }: StoreCardProps) {
-  const [expanded, setExpanded] = useState(false)
-  const alertsForStore = useStore(s => s.alerts.filter(a => a.storeId === store.id && !a.read));
+  const [expanded, setExpanded] = useState(false);
+  const { alerts, notificationSubscriptions, toggleNotificationSubscription } = useStore();
   
-  const stockRegions = store.stockRegions || []
-  const tempSensors = store.tempSensors || []
+  const alertsForStore = alerts.filter(a => a.storeId === store.id && !a.read);
+  const isSubscribed = notificationSubscriptions.has(store.id);
+
+  const stockRegions = store.stockRegions || [];
+  const tempSensors = store.tempSensors || [];
   
-  // ✅ FIX: Sort stock regions logically for display
   const sortedStockRegions = [...stockRegions].sort((a, b) => {
     const [colA, rowA] = a.id.split('-');
     const [colB, rowB] = b.id.split('-');
@@ -41,7 +45,7 @@ export function StoreCard({ store, isSelected, onToggle, onClick }: StoreCardPro
   });
   
   const avgFill = stockRegions.length > 0 ? Math.round(stockRegions.reduce((sum, r) => sum + r.fillLevel, 0) / stockRegions.length) : 0;
-  const avgTemp = tempSensors.length > 0 ? Math.round(tempSensors.reduce((sum, s) => sum + s.temperature, 0) / tempSensors.length * 10) / 10 : 0;
+  const avgTemp = tempSensors.length > 0 ? (tempSensors.reduce((sum, s) => sum + s.temperature, 0) / tempSensors.length) : 0;
   
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300">
@@ -60,10 +64,22 @@ export function StoreCard({ store, isSelected, onToggle, onClick }: StoreCardPro
               <div className="flex items-center text-red-600 text-sm font-semibold mt-2"><AlertCircle className="w-4 h-4 mr-1.5" />{alertsForStore.length} new alert{alertsForStore.length > 1 ? 's' : ''}</div>
             )}
           </div>
-          <label className="relative inline-flex items-center cursor-pointer" onClick={e => e.stopPropagation()}>
-            <input type="checkbox" checked={isSelected} onChange={onToggle} className="sr-only peer" />
-            <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-          </label>
+          <div className="flex items-center space-x-2">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleNotificationSubscription(store.id);
+              }}
+              className={`p-2 rounded-lg transition-colors ${isSubscribed ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+              aria-label={isSubscribed ? 'Unsubscribe from notifications' : 'Subscribe to notifications'}
+            >
+              {isSubscribed ? <Bell className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
+            </button>
+            <label className="relative inline-flex items-center cursor-pointer" onClick={e => e.stopPropagation()}>
+              <input type="checkbox" checked={isSelected} onChange={onToggle} className="sr-only peer" />
+              <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-gray-50/70 rounded-lg p-3">
