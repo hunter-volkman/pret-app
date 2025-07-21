@@ -1,22 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { X, Clock, Thermometer, Camera, Eye, EyeOff } from 'lucide-react';
-
-// ✅ FIX: Updated interface to match the store definition
-interface Alert {
-  id: string;
-  storeId: string;
-  storeName: string;
-  type: 'stock' | 'temperature';
-  title: string;
-  message: string;
-  timestamp: Date;
-  severity: 'low' | 'medium' | 'high';
-  read: boolean;
-  regions?: string[];
-  sensors?: string[];
-  imageUrl?: string;
-  cvImageUrl?: string;
-}
+import { Alert } from '../stores/store';
 
 interface AlertModalProps {
   alert: Alert;
@@ -72,7 +56,7 @@ export function AlertModal({ alert, onClose, onMarkRead }: AlertModalProps) {
             <div className="grid grid-cols-2 gap-4 text-sm bg-gray-50 rounded-lg p-4">
               <div><span className="text-gray-600">Store:</span><span className="ml-2 font-medium">{alert.storeName}</span></div>
               <div><span className="text-gray-600">Time:</span><span className="ml-2 font-medium">{alert.timestamp.toLocaleString()}</span></div>
-              <div><span className="text-gray-600">Type:</span><span className="ml-2 font-medium capitalize">{alert.type.replace('_', ' ')}</span></div>
+              <div><span className="text-gray-600">Type:</span><span className="ml-2 font-medium capitalize">{alert.type}</span></div>
               <div>
                 <span className="text-gray-600">Severity:</span>
                 <span className={`ml-2 font-medium capitalize ${alert.severity === 'high' ? 'text-red-600' : alert.severity === 'medium' ? 'text-yellow-600' : 'text-blue-600'}`}>
@@ -127,14 +111,14 @@ export function AlertModal({ alert, onClose, onMarkRead }: AlertModalProps) {
               </div>
             )}
             
-            {/* ✅ FIX: Restored the missing temperature alert details section */}
             {alert.type === 'temperature' && alert.sensors && (
               <div>
-                <h4 className="font-semibold text-gray-900 mb-3">Temperature Readings</h4>
+                <h4 className="font-semibold text-gray-900 mb-3">Affected Sensors</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                   {alert.sensors.map((sensorId: string) => {
-                    const temp = (Math.random() * 10 + 15).toFixed(1)
-                    const status = Math.random() > 0.5 ? 'warning' : 'critical'
+                    // Placeholder data for display
+                    const temp = (Math.random() * 10 + 15).toFixed(1);
+                    const status = Math.random() > 0.5 ? 'warning' : 'critical';
                     return (
                       <div key={sensorId} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
                         <div className="flex items-center space-x-3">
@@ -150,15 +134,6 @@ export function AlertModal({ alert, onClose, onMarkRead }: AlertModalProps) {
                       </div>
                     )
                   })}
-                </div>
-                <div className="mt-4 text-sm text-gray-600 bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
-                  <div className="flex items-start space-x-2">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full mt-1.5 flex-shrink-0" />
-                    <div>
-                      <strong className="text-yellow-800">Recommended Action:</strong>
-                      <p className="mt-1">Check refrigeration units and verify door seals. Contact maintenance if temperature persists outside normal range.</p>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
