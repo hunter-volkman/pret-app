@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useStore } from './stores/store';
 import { monitor } from './services/monitor';
+import { pushService } from './services/push';
 import { IS_DEMO, toggleDemo } from './config/stores';
 import { IS_AUTH_ENABLED } from './config/auth';
 import { useFusionAuth } from '@fusionauth/react-sdk';
@@ -12,7 +13,6 @@ import { MapView } from './views/MapView';
 import { AlertsView } from './views/AlertsView';
 import { CameraView } from './views/CameraView';
 
-// A mock auth object for when auth is disabled
 const useMockAuth = () => ({
   isAuthenticated: true,
   isLoading: false,
@@ -48,6 +48,11 @@ function MainAppContent() {
   const { logout } = IS_AUTH_ENABLED ? useFusionAuth() : useMockAuth();
   const { currentView, selectedStores, stores, toggleStoreSelection } = useStore();
   const [showSettings, setShowSettings] = React.useState(false);
+
+  useEffect(() => {
+    // Initialize the push service once when the app loads
+    pushService.initialize();
+  }, []);
 
   useEffect(() => {
     if (IS_DEMO && selectedStores.size === 0 && stores.length > 0) {
