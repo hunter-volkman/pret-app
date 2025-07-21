@@ -1,29 +1,40 @@
-import React, { useState } from 'react'
-import { AlertTriangle, Clock, CheckCircle, Filter, Eye, Thermometer, Activity } from 'lucide-react'
-import { useStore, unreadCount } from '../stores/store'
-import { AlertModal } from '../components/AlertModal'
+import React, { useState } from 'react';
+import { Clock, CheckCircle, Filter, Eye, Thermometer, Activity, X } from 'lucide-react';
+import { useStore, unreadCount } from '../stores/store';
+import { AlertModal } from '../components/AlertModal';
+
+type LocalFilter = 'all' | 'unread' | 'stock' | 'temperature';
 
 export function AlertsView() {
-  const { alerts, markAlertRead } = useStore()
-  const [filter, setFilter] = useState<'all' | 'unread' | 'stock' | 'temperature'>('all')
-  const [selectedAlert, setSelectedAlert] = useState<string | null>(null)
+  const { alerts, markAlertRead, alertFilterStoreId, setAlertFilter } = useStore();
+  const [localFilter, setLocalFilter] = useState<LocalFilter>('all');
+  const [selectedAlert, setSelectedAlert] = useState<string | null>(null);
   
-  const filteredAlerts = alerts.filter(alert => {
-    if (filter === 'unread') return !alert.read
-    if (filter === 'stock') return alert.type === 'stock'
-    if (filter === 'temperature') return alert.type === 'temperature'
-    return true
-  })
+  const storeNameForFilter = alertFilterStoreId 
+    ? useStore.getState().stores.find(s => s.id === alertFilterStoreId)?.name
+    : null;
 
-  const selectedAlertData = selectedAlert ? alerts.find(a => a.id === selectedAlert) : null
+  const filteredAlerts = alerts.filter(alert => {
+    // Apply the global store filter first, if it exists
+    if (alertFilterStoreId && alert.storeId !== alertFilterStoreId) {
+      return false;
+    }
+    // Then, apply the local filter
+    if (localFilter === 'unread') return !alert.read;
+    if (localFilter === 'stock') return alert.type === 'stock';
+    if (localFilter === 'temperature') return alert.type === 'temperature';
+    return true;
+  });
+
+  const selectedAlertData = selectedAlert ? alerts.find(a => a.id === selectedAlert) : null;
   
   const handleMarkAllRead = () => {
-    alerts.forEach(alert => {
+    filteredAlerts.forEach(alert => {
       if (!alert.read) {
-        markAlertRead(alert.id)
+        markAlertRead(alert.id);
       }
-    })
-  }
+    });
+  };
   
   if (alerts.length === 0) {
     return (
@@ -36,35 +47,32 @@ export function AlertsView() {
           <p className="text-gray-600">No alerts detected across all monitored locations</p>
         </div>
       </div>
-    )
+    );
   }
   
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Alerts</h2>
           <p className="text-gray-600">
-            {filteredAlerts.length} alert{filteredAlerts.length !== 1 ? 's' : ''}
-            {filter === 'unread' && ` • ${unreadCount()} unread`}
+            {filteredAlerts.length} alert{filteredAlerts.length !== 1 ? 's' : ''} found
           </p>
         </div>
-        
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-2">
             <Filter className="w-4 h-4 text-gray-500" />
             <select 
-              value={filter} 
-              onChange={(e) => setFilter(e.target.value as any)}
+              value={localFilter} 
+              onChange={(e) => setLocalFilter(e.target.value as LocalFilter)}
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="all">All Alerts</option>
+              <option value="all">All Types</option>
               <option value="unread">Unread ({unreadCount()})</option>
-              <option value="stock">Stock Alerts</option>
-              <option value="temperature">Temperature Alerts</option>
+              <option value="stock">Stock</option>
+              <option value="temperature">Temperature</option>
             </select>
           </div>
-          
           {unreadCount() > 0 && (
             <button
               onClick={handleMarkAllRead}
@@ -75,8 +83,23 @@ export function AlertsView() {
           )}
         </div>
       </div>
+
+      {alertFilterStoreId && storeNameForFilter && (
+        <div className="flex items-center justify-between bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-4 py-2 mb-6 animate-in fade-in-0">
+          <span className="font-medium text-sm">Showing alerts for: <strong>{storeNameForFilter}</strong></span>
+          <button onClick={() => setAlertFilter(null)} className="p-1 rounded-full hover:bg-blue-100">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       
       <div className="space-y-4">
+        {filteredAlerts.length === 0 && (
+          <div className="text-center py-10 text-gray-500">
+            <CheckCircle className="w-10 h-10 mx-auto mb-2 text-gray-400" />
+            <p>No alerts match the current filter.</p>
+          </div>
+        )}
         {filteredAlerts.map(alert => (
           <div
             key={alert.id}
@@ -84,7 +107,7 @@ export function AlertsView() {
               alert.severity === 'high' ? 'border-red-200 bg-red-50' :
               alert.severity === 'medium' ? 'border-yellow-200 bg-yellow-50' :
               'border-blue-200 bg-blue-50'
-            } ${!alert.read ? 'ring-2 ring-blue-200 shadow-sm' : ''}`}
+            } ${!alert.read ? 'ring-2 ring-blue-500 shadow-md' : 'opacity-80'}`}
           >
             <div className="flex items-start space-x-3">
               <div className={`mt-1 ${
@@ -92,19 +115,13 @@ export function AlertsView() {
                 alert.severity === 'medium' ? 'text-yellow-500' :
                 'text-blue-500'
               }`}>
-                {alert.type === 'temperature' ? 
-                  <Thermometer className="w-5 h-5" /> : 
-                  <Activity className="w-5 h-5" />
-                }
+                {alert.type === 'temperature' ? <Thermometer className="w-5 h-5" /> : <Activity className="w-5 h-5" />}
               </div>
-              
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-gray-900">{alert.title}</h3>
                   <div className="flex items-center space-x-2">
-                    {!alert.read && (
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                    )}
+                    {!alert.read && <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse" />}
                     <span className={`text-xs font-medium px-2 py-1 rounded-full ${
                       alert.severity === 'high' ? 'bg-red-100 text-red-800' :
                       alert.severity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
@@ -114,68 +131,23 @@ export function AlertsView() {
                     </span>
                   </div>
                 </div>
-                
-                <p className="text-gray-700 mb-3">{alert.message}</p>
-                
-                {/* Affected Items */}
-                {alert.regions && alert.regions.length > 0 && (
-                  <div className="mb-3">
-                    <div className="text-xs text-gray-600 mb-1">Affected Regions:</div>
-                    <div className="flex flex-wrap gap-1">
-                      {alert.regions.map((region: string) => (
-                        <span
-                          key={region}
-                          className="px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full"
-                        >
-                          {region}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {alert.sensors && alert.sensors.length > 0 && (
-                  <div className="mb-3">
-                    <div className="text-xs text-gray-600 mb-1">Affected Sensors:</div>
-                    <div className="flex flex-wrap gap-1">
-                      {alert.sensors.map((sensor: string) => (
-                        <span
-                          key={sensor}
-                          className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full"
-                        >
-                          {sensor}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
+                <p className="text-sm text-gray-700 mb-3">{alert.message}</p>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4 text-sm text-gray-600">
+                  <div className="flex items-center space-x-4 text-xs text-gray-600">
                     <span className="font-medium">{alert.storeName}</span>
                     <div className="flex items-center">
-                      <Clock className="w-4 h-4 mr-1" />
+                      <Clock className="w-3 h-3 mr-1" />
                       {alert.timestamp.toLocaleTimeString()}
                     </div>
                   </div>
-                  
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => setSelectedAlert(alert.id)}
                       className="flex items-center space-x-1 text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors px-3 py-1 rounded-lg hover:bg-blue-50"
                     >
                       <Eye className="w-4 h-4" />
-                      <span>View Details</span>
+                      <span>View</span>
                     </button>
-                    
-                    {!alert.read && (
-                      <button
-                        onClick={() => markAlertRead(alert.id)}
-                        className="text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors px-3 py-1 rounded-lg hover:bg-blue-50"
-                      >
-                        Mark Read
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>
@@ -184,7 +156,6 @@ export function AlertsView() {
         ))}
       </div>
       
-      {/* Alert Details Modal */}
       {selectedAlertData && (
         <AlertModal
           alert={selectedAlertData}
@@ -193,5 +164,5 @@ export function AlertsView() {
         />
       )}
     </div>
-  )
+  );
 }
