@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { STORES } from '../config/stores'
 import { Store as StoreConfig } from '../config/stores'
 
@@ -38,7 +39,6 @@ export interface Alert {
 }
 
 // The main data type for a store in our app state.
-// Extends the base configuration to include dynamic, real-time data.
 export interface StoreData extends StoreConfig {
   status: 'online' | 'offline'
   stockRegions: StockRegion[]
@@ -48,79 +48,114 @@ export interface StoreData extends StoreConfig {
 
 type View = 'stores' | 'map' | 'alerts' | 'camera';
 
-// The complete shape of our application's state managed by Zustand
 interface AppState {
   stores: StoreData[]
   alerts: Alert[]
   currentView: View
   currentStore: StoreData | null
   selectedStores: Set<string>
-  /** A store ID used to filter the alerts view, typically set from the map. */
-  alertFilterStoreId: string | null 
-  
-  // Actions to modify the state
+  alertFilterStoreId: string | null
+  /** A set of store IDs the user is subscribed to for push notifications. */
+  notificationSubscriptions: Set<string>
+
+  // Actions
   updateStore: (id: string, data: Partial<Omit<StoreData, 'id'>>) => void
   setCurrentView: (view: View) => void
   setCurrentStore: (store: StoreData | null) => void
   toggleStoreSelection: (id: string) => void
   addAlert: (alert: Alert) => void
   markAlertRead: (id: string) => void
-  /** Sets a global filter for the alerts view and navigates to it. */
   setAlertFilter: (storeId: string | null) => void
+  /** Toggles a user's push notification subscription for a specific store. */
+  toggleNotificationSubscription: (storeId: string) => void
 }
 
-export const useStore = create<AppState>((set) => ({
-  stores: STORES.map(store => ({
-    ...store,
-    status: 'offline',
-    stockRegions: [],
-    tempSensors: [],
-  })),
-  alerts: [],
-  currentView: 'stores',
-  currentStore: null,
-  selectedStores: new Set(),
-  alertFilterStoreId: null,
-  
-  updateStore: (id, data) => set(state => ({
-    stores: state.stores.map(store => 
-      store.id === id ? { ...store, ...data, lastUpdate: new Date() } : store
-    )
-  })),
-  
-  setCurrentView: (view) => set((state) => {
-    // When navigating away from the alerts view, automatically clear the store filter
-    if (state.currentView === 'alerts' && view !== 'alerts') {
-      return { currentView: view, alertFilterStoreId: null };
+export const useStore = create<AppState>()(
+  persist(
+    (set) => ({
+      stores: STORES.map(store => ({
+        ...store,
+        status: 'offline',
+        stockRegions: [],
+        tempSensors: [],
+      })),
+      alerts: [],
+      currentView: 'stores',
+      currentStore: null,
+      selectedStores: new Set(),
+      alertFilterStoreId: null,
+      notificationSubscriptions: new Set(),
+      
+      updateStore: (id, data) => set(state => ({
+        stores: state.stores.map(store => 
+          store.id === id ? { ...store, ...data, lastUpdate: new Date() } : store
+        )
+      })),
+      
+      setCurrentView: (view) => set((state) => {
+        if (state.currentView === 'alerts' && view !== 'alerts') {
+          return { currentView: view, alertFilterStoreId: null };
+        }
+        return { currentView: view };
+      }),
+
+      setCurrentStore: (store) => set({ currentStore: store }),
+      
+      toggleStoreSelection: (id) => set(state => {
+        const newSelected = new Set(state.selectedStores);
+        newSelected.has(id) ? newSelected.delete(id) : newSelected.add(id);
+        return { selectedStores: newSelected };
+      }),
+      
+      addAlert: (alert) => set(state => ({
+        alerts: [alert, ...state.alerts.slice(0, 49)]
+      })),
+      
+      markAlertRead: (id) => set(state => ({
+        alerts: state.alerts.map(alert => 
+          alert.id === id ? { ...alert, read: true } : alert
+        )
+      })),
+
+      setAlertFilter: (storeId) => set({ alertFilterStoreId: storeId, currentView: 'alerts' }),
+
+      toggleNotificationSubscription: (storeId) => set(state => {
+        const newSubscriptions = new Set(state.notificationSubscriptions);
+        newSubscriptions.has(storeId) ? newSubscriptions.delete(storeId) : newSubscriptions.add(storeId);
+        console.log('New subscriptions:', newSubscriptions);
+        return { notificationSubscriptions: newSubscriptions };
+      }),
+    }),
+    {
+      name: 'pret-monitor-storage', // Unique name for localStorage key
+      // Only persist the alerts and notification subscriptions slices
+      partialize: (state) => ({ 
+        alerts: state.alerts,
+        notificationSubscriptions: state.notificationSubscriptions,
+       }),
+       // Use a custom storage object to handle Set and Date serialization
+       storage: createJSONStorage(() => localStorage, {
+        replacer: (key, value) => {
+          if (value instanceof Set) {
+            return { _type: 'Set', value: Array.from(value) };
+          }
+          if (key === 'timestamp' && typeof value === 'string') {
+            return new Date(value).toISOString();
+          }
+          return value;
+        },
+        reviver: (key, value) => {
+          if (typeof value === 'object' && value !== null && value._type === 'Set') {
+            return new Set(value.value);
+          }
+          if (key === 'timestamp' && typeof value === 'string') {
+            return new Date(value);
+          }
+          return value;
+        }
+       }),
     }
-    return { currentView: view };
-  }),
+  )
+);
 
-  setCurrentStore: (store) => set({ currentStore: store }),
-  
-  toggleStoreSelection: (id) => set(state => {
-    const newSelected = new Set(state.selectedStores)
-    if (newSelected.has(id)) {
-      newSelected.delete(id)
-    } else {
-      newSelected.add(id)
-    }
-    return { selectedStores: newSelected }
-  }),
-  
-  addAlert: (alert) => set(state => ({
-    // Prepend new alerts and cap the list at 50 to prevent memory issues
-    alerts: [alert, ...state.alerts.slice(0, 49)]
-  })),
-  
-  markAlertRead: (id) => set(state => ({
-    alerts: state.alerts.map(alert => 
-      alert.id === id ? { ...alert, read: true } : alert
-    )
-  })),
-
-  setAlertFilter: (storeId) => set({ alertFilterStoreId: storeId, currentView: 'alerts' }),
-}))
-
-// A selector to compute the number of unread alerts for badging
-export const unreadCount = () => useStore.getState().alerts.filter(a => !a.read).length
+export const unreadCount = () => useStore.getState().alerts.filter(a => !a.read).length;
