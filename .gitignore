@@ -16,3 +16,4 @@ src/config/dev-credentials.ts
 sw.js
 workbox-*.js
 public/sw.js
+.env*.local
