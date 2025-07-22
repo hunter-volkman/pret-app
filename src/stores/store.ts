@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { STORES } from '../config/stores'
 import { Store as StoreConfig } from '../config/stores'
+import { push } from '../services/push'
 
 // Data shape for a computer vision stock detection region
 interface StockRegion {
@@ -67,12 +68,12 @@ interface AppState {
   markAlertRead: (id: string) => void
   setAlertFilter: (storeId: string | null) => void
   /** Toggles a user's push notification subscription for a specific store. */
-  toggleNotificationSubscription: (storeId: string) => void
+  toggleNotificationSubscription: (storeId: string) => Promise<void>
 }
 
 export const useStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       stores: STORES.map(store => ({
         ...store,
         status: 'offline',
@@ -119,22 +120,32 @@ export const useStore = create<AppState>()(
 
       setAlertFilter: (storeId) => set({ alertFilterStoreId: storeId, currentView: 'alerts' }),
 
-      toggleNotificationSubscription: (storeId) => set(state => {
-        const newSubscriptions = new Set(state.notificationSubscriptions);
-        newSubscriptions.has(storeId) ? newSubscriptions.delete(storeId) : newSubscriptions.add(storeId);
-        console.log('New subscriptions:', newSubscriptions);
-        return { notificationSubscriptions: newSubscriptions };
-      }),
+      toggleNotificationSubscription: async (storeId) => {
+        const isSubscribed = get().notificationSubscriptions.has(storeId);
+        const newSubscriptions = new Set(get().notificationSubscriptions);
+
+        if (isSubscribed) {
+          await push.unsubscribe(storeId);
+          newSubscriptions.delete(storeId);
+          console.log('UI: Unsubscribed from', storeId);
+        } else {
+          const subscription = await push.subscribe(storeId);
+          if (subscription) { // Only update UI if subscription was successful
+            newSubscriptions.add(storeId);
+            console.log('UI: Subscribed to', storeId);
+          }
+        }
+        
+        set({ notificationSubscriptions: newSubscriptions });
+      },
     }),
     {
-      name: 'pret-monitor-storage', // Unique name for localStorage key
-      // Only persist the alerts and notification subscriptions slices
+      name: 'pret-monitor-storage', 
       partialize: (state) => ({ 
         alerts: state.alerts,
         notificationSubscriptions: state.notificationSubscriptions,
        }),
-       // Use a custom storage object to handle Set and Date serialization
-       storage: createJSONStorage(() => localStorage, {
+        storage: createJSONStorage(() => localStorage, {
         replacer: (key, value) => {
           if (value instanceof Set) {
             return { _type: 'Set', value: Array.from(value) };
@@ -145,6 +156,9 @@ export const useStore = create<AppState>()(
           return value;
         },
         reviver: (key, value) => {
+          if (key === 'notificationSubscriptions' && Array.isArray(value)) {
+            return new Set(value);
+          }
           if (typeof value === 'object' && value !== null && value._type === 'Set') {
             return new Set(value.value);
           }
