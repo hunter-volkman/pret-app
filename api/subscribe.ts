@@ -1,6 +1,10 @@
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+
+import { kv } from '@vercel/kv';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-export default function handler(
+export default async function handler(
   request: VercelRequest,
   response: VercelResponse,
 ) {
@@ -8,14 +12,18 @@ export default function handler(
     return response.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { storeId, subscription } = request.body;
+  try {
+    const { storeId, subscription } = request.body;
+    if (!storeId || !subscription || !subscription.endpoint) {
+      return response.status(400).json({ error: 'Missing or invalid storeId or subscription.' });
+    }
 
-  console.log('✅ Received new subscription request:');
-  console.log('   Store ID:', storeId);
-  console.log('   Subscription Endpoint:', subscription?.endpoint);
+    await kv.sadd(`subscriptions:${storeId}`, subscription);
+    console.log(`[API] Subscribed to ${storeId}:`, subscription.endpoint);
+    return response.status(201).json({ success: true });
 
-  response.status(201).json({
-    success: true,
-    message: 'Subscription received and logged.',
-  });
+  } catch (error) {
+    console.error('[API Subscribe Error]', error);
+    return response.status(500).json({ error: 'Internal Server Error' });
+  }
 }
