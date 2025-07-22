@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useStore } from './stores/store';
 import { monitor } from './services/monitor';
-import { pushService } from './services/push';
+import { push } from './services/push';
 import { IS_DEMO, toggleDemo } from './config/stores';
 import { IS_AUTH_ENABLED } from './config/auth';
 import { useFusionAuth } from '@fusionauth/react-sdk';
@@ -51,7 +51,7 @@ function MainAppContent() {
 
   useEffect(() => {
     // Initialize the push service once when the app loads
-    pushService.initialize();
+    push.initialize();
   }, []);
 
   useEffect(() => {
