@@ -5,7 +5,7 @@ import { Store as StoreConfig } from '../config/stores'
 import { push } from '../services/push'
 
 // Data shape for a computer vision stock detection region
-interface StockRegion {
+export interface StockRegion {
   id: string
   name: string
   fillLevel: number
@@ -13,7 +13,7 @@ interface StockRegion {
 }
 
 // Data shape for an IoT temperature sensor reading
-interface TempSensor {
+export interface TempSensor {
   id: string
   name: string
   temperature: number
@@ -155,7 +155,7 @@ export const useStore = create<AppState>()(
           }
           return value;
         },
-        reviver: (key, value) => {
+        reviver: (key, value: any) => {
           if (key === 'notificationSubscriptions' && Array.isArray(value)) {
             return new Set(value);
           }
