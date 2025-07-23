@@ -52,10 +52,8 @@ class MonitorService {
   
   private async checkAlerts(store: Store, stockRegions: any[], tempSensors: any[]): Promise<void> {
     const { alerts, addAlert } = useStore.getState();
-    // Prevent alert spam by only creating one of each type per 5-minute window
     const recentAlertCutoff = Date.now() - (5 * 60 * 1000);
 
-    // Stock alerts
     const lowStock = stockRegions.filter(r => r.status === 'empty' || r.status === 'low');
     if (lowStock.length > 2) {
       const hasRecentStockAlert = alerts.some(a => 
@@ -63,7 +61,6 @@ class MonitorService {
       );
       
       if (!hasRecentStockAlert) {
-        // Fetch both raw and CV images concurrently for performance
         const [imageUrl, cvImageUrl] = await Promise.all([
           viam.getCameraImage(store.stockMachineId, false),
           viam.getCameraImage(store.stockMachineId, true)
@@ -86,7 +83,6 @@ class MonitorService {
       }
     }
 
-    // Temperature alerts
     const tempIssues = tempSensors.filter(t => t.status !== 'normal');
     if (tempIssues.length > 0) {
       const hasRecentTempAlert = alerts.some(a => 
