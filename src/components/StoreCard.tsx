@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ChevronDown, MapPin, Thermometer, Activity, Wifi, WifiOff, AlertCircle, Bell, BellOff } from 'lucide-react';
 import { useStore, StoreData } from '../stores/store';
 
