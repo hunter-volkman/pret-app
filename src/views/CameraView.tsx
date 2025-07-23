@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Camera, ArrowLeft, Loader2 } from 'lucide-react';
 import { useStore } from '../stores/store';
 import { viam } from '../services/viam';
@@ -123,7 +123,6 @@ export function CameraView() {
     );
   }
 
-  // A derived state for the "upgrading" phase
   const isUpgrading = previewUrl && !isStreamReady;
 
   return (
@@ -140,7 +139,6 @@ export function CameraView() {
         </div>
       </div>
       
-      {/* ✅ UX POLISH: Added 'relative overflow-hidden' for the shimmer effect */}
       <div className="bg-gray-900 rounded-lg overflow-hidden aspect-video relative flex items-center justify-center">
         {(isLoading && !previewUrl) && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
@@ -182,7 +180,6 @@ export function CameraView() {
           {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </div>
         
-        {/* ✅ UX POLISH: The new connecting indicator bar and shimmer effect */}
         {isUpgrading && (
           <>
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
