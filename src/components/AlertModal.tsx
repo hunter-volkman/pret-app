@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Clock, Thermometer, Camera, Eye, EyeOff } from 'lucide-react';
+import { X, Thermometer, Camera, Eye, EyeOff } from 'lucide-react';
 import { Alert } from '../stores/store';
 
 interface AlertModalProps {
