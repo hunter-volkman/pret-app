@@ -1,4 +1,3 @@
-import React from 'react'
 import { useStore } from '../stores/store'
 import { StoreCard } from '../components/StoreCard'
 
