@@ -13,7 +13,6 @@ const AuthProviderWrapper: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const clientId = import.meta.env.VITE_VIAM_OAUTH_CLIENT_ID;
-  const orgId = 'cc36ba4b-8053-441e-84fa-136270d34584';
 
   if (!clientId) {
     throw new Error("VITE_VIAM_OAUTH_CLIENT_ID is not set in your .env.local file.");
@@ -21,10 +20,9 @@ const AuthProviderWrapper: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <FusionAuthProvider
-      host="https://auth.viam.com"
+      serverUrl="https://auth.viam.com"
       clientID={clientId}
-      tenantId={orgId}
-      redirectURI={window.location.origin}
+      redirectUri={window.location.origin}
     >
       {children}
     </FusionAuthProvider>
