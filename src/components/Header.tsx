@@ -1,4 +1,3 @@
-import React from 'react'
 import { Bell, Wifi, WifiOff } from 'lucide-react'
 import { useStore, unreadCount } from '../stores/store'
 
