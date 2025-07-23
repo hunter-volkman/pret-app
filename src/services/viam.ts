@@ -1,5 +1,6 @@
 import * as VIAM from '@viamrobotics/sdk';
 import { DEV_VIAM_CREDENTIALS } from '../config/dev-credentials';
+import { StockRegion, TempSensor } from '../stores/store';
 
 const USE_DEV_CREDS = import.meta.env.DEV && DEV_VIAM_CREDENTIALS.apiKeyId !== 'PASTE_YOUR_API_KEY_ID_HERE';
 
@@ -91,7 +92,7 @@ class ViamService {
     }
   }
 
-  async getStockReadings(machineId: string) {
+  async getStockReadings(machineId: string): Promise<StockRegion[]> {
     const client = await this.connect(machineId);
     if (!client) return [];
     try {
@@ -99,27 +100,27 @@ class ViamService {
       const readings = await sensor.getReadings();
       return Object.entries(readings)
         .filter(([key]) => !key.endsWith('_raw') && key !== 'is_occluded_by_person')
-        .map(([id, value]) => ({
-          id,
-          name: id,
-          fillLevel: Math.max(0, Math.min(100, Math.round(Number(value) || 0))),
-          status: Number(value) < 20 ? 'empty' : Number(value) < 40 ? 'low' : 'ok',
-        }));
+        .map(([id, value]) => {
+          const status: StockRegion['status'] = Number(value) < 20 ? 'empty' : Number(value) < 40 ? 'low' : 'ok';
+          return {
+            id,
+            name: id,
+            fillLevel: Math.max(0, Math.min(100, Math.round(Number(value) || 0))),
+            status,
+          }
+        });
     } catch (error) {
       console.error(`Stock readings failed for ${machineId}:`, error);
       return [];
     }
   }
   
-  async getTemperatureReadings(machineId: string) {
+  async getTemperatureReadings(machineId: string): Promise<TempSensor[]> {
     const client = await this.connect(machineId);
     if (!client) return [];
     try {
-      // The gateway component is always named "gateway"
       const sensor = new VIAM.SensorClient(client, 'gateway');
       const readings = await sensor.getReadings();
-
-      // Iterate through the map of sensor data from the gateway
       return Object.entries(readings).map(([id, data]: [string, any]) => ({
         id,
         name: this.getSensorName(id),
