@@ -1,4 +1,3 @@
-import React from 'react'
 import { Home, Bell, Camera, Map } from 'lucide-react'
 import { useStore, unreadCount } from '../stores/store'
 
