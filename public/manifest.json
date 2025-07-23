@@ -1,0 +1,21 @@
+{
+  "name": "Pret Monitor",
+  "short_name": "Pret Monitor",
+  "description": "Real-time store monitoring for Pret A Manger",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#DC2626",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
