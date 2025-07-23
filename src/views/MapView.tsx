@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useStore, StoreData } from '../stores/store';
-import { Camera, AlertTriangle, Maximize } from 'lucide-react';
+import { Camera, AlertTriangle } from 'lucide-react';
 
 // Animate the pulsing for stores with active alerts
 const pulsingIconStyle = `
@@ -54,10 +54,10 @@ const icons = {
 };
 
 // A component to automatically fit the map to the markers
-const AutoFitBounds = ({ bounds }: { bounds: L.LatLngBoundsExpression }) => {
+const AutoFitBounds = ({ bounds }: { bounds: L.LatLngBounds }) => {
   const map = useMap();
   useEffect(() => {
-    if (L.latLngBounds(bounds).isValid()) {
+    if (bounds.isValid()) {
       map.fitBounds(bounds, { padding: [50, 50] });
     }
   }, [map, bounds]);
