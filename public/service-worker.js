@@ -2,8 +2,9 @@
 const CACHE_NAME = 'pret-monitor-v1'
 const urlsToCache = [
   '/',
-  '/static/manifest.json',
-  '/static/icon-192.png'
+  '/manifest.json',
+  '/icons/icon-192x192.png',
+  '/icons/icon-512x512.png'
 ]
 
 // Install
@@ -30,10 +31,12 @@ self.addEventListener('fetch', event => {
 
 // Push notifications
 self.addEventListener('push', event => {
+  const data = event.data ? event.data.json() : {};
+  const title = data.title || 'Pret Monitor';
   const options = {
-    body: event.data ? event.data.text() : 'New alert from Pret Monitor',
-    icon: '/static/icon-192.png',
-    badge: '/static/icon-192.png',
+    body: data.message || 'New alert from Pret Monitor',
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-192x192.png',
     vibrate: [100, 50, 100],
     data: { dateOfArrival: Date.now() },
     actions: [
@@ -43,7 +46,7 @@ self.addEventListener('push', event => {
   }
 
   event.waitUntil(
-    self.registration.showNotification('Pret Monitor', options)
+    self.registration.showNotification(title, options)
   )
 })
 
