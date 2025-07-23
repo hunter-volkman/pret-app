@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Clock, CheckCircle, Filter, Eye, Thermometer, Activity, X } from 'lucide-react';
 import { useStore, unreadCount } from '../stores/store';
 import { AlertModal } from '../components/AlertModal';
@@ -15,11 +15,9 @@ export function AlertsView() {
     : null;
 
   const filteredAlerts = alerts.filter(alert => {
-    // Apply the global store filter first, if it exists
     if (alertFilterStoreId && alert.storeId !== alertFilterStoreId) {
       return false;
     }
-    // Then, apply the local filter
     if (localFilter === 'unread') return !alert.read;
     if (localFilter === 'stock') return alert.type === 'stock';
     if (localFilter === 'temperature') return alert.type === 'temperature';
