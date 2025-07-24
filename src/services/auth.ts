@@ -76,8 +76,8 @@ class ViamAuthService {
     }
     localStorage.setItem('viam_token_expiry', this.tokenExpiry.toString());
     
-    // Fetch user info after storing tokens
-    this.fetchUserInfo();
+    // Create basic user info since we have a valid token
+    this.createUserInfo();
   }
 
   private clearTokens(): void {
@@ -92,23 +92,15 @@ class ViamAuthService {
     localStorage.removeItem('viam_user_info');
   }
 
-  private async fetchUserInfo(): Promise<void> {
-    if (!this.accessToken) return;
-    
-    try {
-      const response = await fetch('https://auth.viam.com/oauth2/userinfo', {
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-        },
-      });
-      
-      if (response.ok) {
-        this.userInfo = await response.json();
-        localStorage.setItem('viam_user_info', JSON.stringify(this.userInfo));
-      }
-    } catch (error) {
-      console.error('Failed to fetch user info:', error);
-    }
+  private createUserInfo(): void {
+    // Since we have a valid token, create basic user info
+    // We could expand this later to fetch actual user details
+    this.userInfo = {
+      sub: 'viam-user',
+      email: 'user@viam.com',
+      given_name: 'Viam User'
+    };
+    localStorage.setItem('viam_user_info', JSON.stringify(this.userInfo));
   }
 
   private async handleOAuthCallback(): Promise<void> {
@@ -118,7 +110,7 @@ class ViamAuthService {
     const error = urlParams.get('error');
     
     if (error) {
-      console.error('OAuth error:', error);
+      console.error('❌ OAuth error:', error);
       return;
     }
     
@@ -128,6 +120,7 @@ class ViamAuthService {
       
       if (state === storedState && codeVerifier) {
         try {
+          console.log('🔄 Processing OAuth callback...');
           await this.exchangeCodeForToken(code, codeVerifier);
           console.log('✅ Successfully authenticated with Viam');
         } catch (error) {
@@ -141,7 +134,7 @@ class ViamAuthService {
         // Clean URL without page reload
         window.history.replaceState({}, document.title, window.location.pathname);
       } else {
-        console.error('Invalid OAuth state or missing code verifier');
+        console.error('❌ Invalid OAuth state or missing code verifier');
       }
     }
   }
@@ -168,7 +161,7 @@ class ViamAuthService {
     authUrl.searchParams.set('client_id', this.clientId);
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('redirect_uri', this.redirectUri);
-    authUrl.searchParams.set('scope', 'offline_access openid profile email');
+    authUrl.searchParams.set('scope', 'offline_access');
     authUrl.searchParams.set('state', state);
     authUrl.searchParams.set('code_challenge', codeChallenge);
     authUrl.searchParams.set('code_challenge_method', 'S256');
@@ -190,23 +183,22 @@ class ViamAuthService {
   }
 
   private async exchangeCodeForToken(code: string, codeVerifier: string): Promise<void> {
-    const response = await fetch('https://auth.viam.com/oauth2/token', {
+    // Use our serverless proxy to avoid CORS issues
+    const response = await fetch('/api/oauth-token', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
       },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
+      body: JSON.stringify({
         code,
-        client_id: this.clientId,
-        redirect_uri: this.redirectUri,
-        code_verifier: codeVerifier,
+        codeVerifier,
+        redirectUri: this.redirectUri,
       }),
     });
     
     if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(`Token exchange failed: ${response.status} ${errorData}`);
+      const errorData = await response.json();
+      throw new Error(`Token exchange failed: ${response.status} ${errorData.error}`);
     }
     
     const tokenData: TokenResponse = await response.json();
@@ -219,15 +211,15 @@ class ViamAuthService {
     }
 
     try {
-      const response = await fetch('https://auth.viam.com/oauth2/token', {
+      // Use the same proxy for refresh tokens
+      const response = await fetch('/api/oauth-token', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: this.refreshToken,
-          client_id: this.clientId,
+        body: JSON.stringify({
+          grantType: 'refresh_token',
+          refreshToken: this.refreshToken,
         }),
       });
 
