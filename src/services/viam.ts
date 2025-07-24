@@ -1,8 +1,11 @@
 import * as VIAM from '@viamrobotics/sdk';
 import { DEV_VIAM_CREDENTIALS } from '../config/dev-credentials';
 import { StockRegion, TempSensor } from '../stores/store';
+import { auth } from './auth';
 
-const USE_DEV_CREDS = import.meta.env.DEV && DEV_VIAM_CREDENTIALS.apiKeyId !== 'PASTE_YOUR_API_KEY_ID_HERE';
+const USE_DEV_CREDS = import.meta.env.DEV && 
+  DEV_VIAM_CREDENTIALS?.apiKeyId && 
+  DEV_VIAM_CREDENTIALS.apiKeyId !== 'PASTE_YOUR_API_KEY_ID_HERE';
 
 class ViamService {
   private clients = new Map<string, VIAM.RobotClient>();
@@ -25,36 +28,52 @@ class ViamService {
     return addressMap[machineId] || null;
   }
 
-  private getCookieCredentials(machineId: string) {
-    try {
-      const cookie = document.cookie.split(';').find(row => row.trim().startsWith(machineId));
-      if (cookie) {
-        const data = JSON.parse(decodeURIComponent(cookie.split('=')[1]));
-        return { apiKey: data.key, apiKeyId: data.id, hostname: data.hostname };
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
-
   async connect(machineId: string): Promise<VIAM.RobotClient | null> {
     if (!machineId) {
       console.error("[ViamService] Connect called with undefined machineId.");
       return null;
     }
+    
     if (this.clients.has(machineId)) {
       return this.clients.get(machineId)!;
     }
 
-    if (USE_DEV_CREDS) {
-      const host = this.getMachineAddress(machineId);
-      if (!host) {
-        console.error(`[ViamService] ❌ Could not find a known address for machine ID: ${machineId}`);
+    const host = this.getMachineAddress(machineId);
+    if (!host) {
+      console.error(`[ViamService] ❌ Could not find address for machine ID: ${machineId}`);
+      return null;
+    }
+
+    // Priority 1: Try OAuth token
+    try {
+      const accessToken = await auth.getAccessToken();
+      if (accessToken && accessToken !== 'mock-token') {
+        const client = await VIAM.createRobotClient({
+          host,
+          credentials: {
+            type: 'access-token',
+            payload: accessToken,
+          },
+          signalingAddress: 'https://app.viam.com:443',
+        });
+        console.log(`[ViamService] ✅ Connected via OAuth token to ${host}`);
+        this.clients.set(machineId, client);
+        return client;
+      }
+    } catch (error) {
+      console.error(`[ViamService] ❌ OAuth connection failed for ${host}:`, error);
+      
+      // If OAuth fails and auth is enabled, trigger re-authentication
+      const isTokenValid = await auth.isTokenValid();
+      if (!isTokenValid && import.meta.env.VITE_AUTH_ENABLED !== 'false') {
+        console.log('[ViamService] 🔄 Token invalid, triggering re-authentication...');
+        setTimeout(() => auth.login(), 1000);
         return null;
       }
-      console.log(`[ViamService] Using local dev API Key to connect to host: ${host}`);
+    }
 
+    // Priority 2: Fallback to dev credentials in development
+    if (USE_DEV_CREDS) {
       try {
         const client = await VIAM.createRobotClient({
           host,
@@ -65,31 +84,16 @@ class ViamService {
           },
           signalingAddress: 'https://app.viam.com:443',
         });
-        console.log(`[ViamService] ✅ Successfully connected to ${host} via API Key.`);
+        console.log(`[ViamService] ✅ Connected via dev API key to ${host}`);
         this.clients.set(machineId, client);
         return client;
       } catch (error) {
-        console.error(`[ViamService] ❌ API Key connection failed for ${host}.`);
-        console.error('[ViamService] Full error object:', error);
-        return null;
+        console.error(`[ViamService] ❌ Dev API key connection failed for ${host}:`, error);
       }
     }
 
-    console.log('[ViamService] Attempting to connect via Viam App cookies.');
-    const creds = this.getCookieCredentials(machineId);
-    if (!creds) { return null; }
-    try {
-      const client = await VIAM.createRobotClient({
-        host: creds.hostname,
-        credentials: { type: 'api-key', payload: creds.apiKey, authEntity: creds.apiKeyId },
-        signalingAddress: 'https://app.viam.com:443',
-      });
-      this.clients.set(machineId, client);
-      return client;
-    } catch (error) {
-      console.error(`[ViamService] ❌ Cookie-based connection failed for ${machineId}:`, error);
-      return null;
-    }
+    console.error('[ViamService] ❌ No valid authentication method available');
+    return null;
   }
 
   async getStockReadings(machineId: string): Promise<StockRegion[]> {
@@ -151,15 +155,21 @@ class ViamService {
   
   private getSensorName(id: string): string {
     const names: Record<string, string> = {
-      'a700000000000000': 'Main Fridge', 'a800000000000000': 'Back Fridge', 'a900000000000000': 'Freezer',
+      'a700000000000000': 'Main Fridge', 
+      'a800000000000000': 'Back Fridge', 
+      'a900000000000000': 'Freezer',
     };
     return names[id] || id;
   }
   
   private getTempStatus(temp: number, id: string): 'normal' | 'warning' | 'critical' {
     const name = this.getSensorName(id).toLowerCase();
-    if (name.includes('freezer')) { return temp > -5 || temp < -20 ? 'critical' : 'normal'; }
-    if (name.includes('fridge')) { return temp > 8 || temp < 0 ? 'warning' : 'normal'; }
+    if (name.includes('freezer')) { 
+      return temp > -5 || temp < -20 ? 'critical' : 'normal'; 
+    }
+    if (name.includes('fridge')) { 
+      return temp > 8 || temp < 0 ? 'warning' : 'normal'; 
+    }
     return temp > 25 || temp < 15 ? 'warning' : 'normal';
   }
 
