@@ -76,8 +76,8 @@ class ViamAuthService {
     }
     localStorage.setItem('viam_token_expiry', this.tokenExpiry.toString());
     
-    // Create basic user info since we have a valid token
-    this.createUserInfo();
+    // Fetch real user info after storing tokens
+    this.fetchUserInfo();
   }
 
   private clearTokens(): void {
@@ -92,15 +92,40 @@ class ViamAuthService {
     localStorage.removeItem('viam_user_info');
   }
 
-  private createUserInfo(): void {
-    // Since we have a valid token, create basic user info
-    // We could expand this later to fetch actual user details
-    this.userInfo = {
-      sub: 'viam-user',
-      email: 'user@viam.com',
-      given_name: 'Viam User'
-    };
-    localStorage.setItem('viam_user_info', JSON.stringify(this.userInfo));
+  private async fetchUserInfo(): Promise<void> {
+    if (!this.accessToken) return;
+    
+    try {
+      console.log('👤 Fetching real user info from Viam...');
+      
+      const response = await fetch('/api/viam-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          accessToken: this.accessToken,
+        }),
+      });
+      
+      if (response.ok) {
+        this.userInfo = await response.json();
+        localStorage.setItem('viam_user_info', JSON.stringify(this.userInfo));
+        console.log('✅ User info updated:', this.userInfo);
+      } else {
+        throw new Error('Failed to fetch user info');
+      }
+    } catch (error) {
+      console.error('❌ Failed to fetch user info:', error);
+      // Fallback user info
+      this.userInfo = {
+        sub: 'authenticated-user',
+        email: 'user@viam.com',
+        given_name: 'Authenticated',
+        family_name: 'User'
+      };
+      localStorage.setItem('viam_user_info', JSON.stringify(this.userInfo));
+    }
   }
 
   private async handleOAuthCallback(): Promise<void> {
@@ -123,6 +148,11 @@ class ViamAuthService {
           console.log('🔄 Processing OAuth callback...');
           await this.exchangeCodeForToken(code, codeVerifier);
           console.log('✅ Successfully authenticated with Viam');
+          
+          // Force a slight delay to ensure token storage completes
+          setTimeout(() => {
+            window.location.reload();
+          }, 100);
         } catch (error) {
           console.error('❌ Token exchange failed:', error);
         }
@@ -148,6 +178,9 @@ class ViamAuthService {
     if (!this.clientId || !this.orgId) {
       throw new Error('Viam OAuth not configured. Missing VITE_VIAM_OAUTH_CLIENT_ID or VITE_VIAM_ORG_ID');
     }
+
+    // Clear any existing tokens before starting new login
+    this.clearTokens();
 
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = await generateCodeChallenge(codeVerifier);
@@ -179,6 +212,9 @@ class ViamAuthService {
       logoutUrl.searchParams.set('client_id', this.clientId);
       logoutUrl.searchParams.set('returnTo', this.redirectUri);
       window.location.href = logoutUrl.toString();
+    } else {
+      // Just reload if auth is disabled
+      window.location.reload();
     }
   }
 
@@ -211,7 +247,6 @@ class ViamAuthService {
     }
 
     try {
-      // Use the same proxy for refresh tokens
       const response = await fetch('/api/oauth-token', {
         method: 'POST',
         headers: {
