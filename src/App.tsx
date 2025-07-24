@@ -15,23 +15,20 @@ import { CameraView } from './views/CameraView';
 
 function LoginScreen() {
   const [isLoading, setIsLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
 
   const handleLogin = async () => {
     setIsLoading(true);
-    setError(null);
     try {
       await auth.login();
     } catch (error) {
       console.error('Login failed:', error);
-      setError('Login failed. Please try again.');
       setIsLoading(false);
     }
   };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
-      <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-10 max-w-md w-full text-center border border-white/20">
+      <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-10 max-w-md w-full text-center border border-white/20">
         <div className="w-20 h-20 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 rounded-2xl mx-auto mb-8 flex items-center justify-center shadow-lg">
           <span className="text-white font-black text-2xl">P</span>
         </div>
@@ -42,12 +39,6 @@ function LoginScreen() {
         <p className="text-gray-600 mb-8 text-lg">
           Real-time Fleet Operations Dashboard
         </p>
-        
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-            {error}
-          </div>
-        )}
         
         <button
           onClick={handleLogin}
@@ -60,27 +51,16 @@ function LoginScreen() {
             <Shield className="w-6 h-6" />
           )}
           <span className="text-lg">
-            {isLoading ? 'Authenticating...' : 'Sign In with Viam'}
+            {isLoading ? 'Connecting...' : 'Sign In with Viam'}
           </span>
         </button>
         
         {!IS_AUTH_ENABLED && (
           <div className="mt-8 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-2xl">
-            <p className="text-sm text-yellow-800 font-bold flex items-center justify-center space-x-2">
-              <span>⚡</span>
-              <span>Development Mode Active</span>
-              <span>⚡</span>
-            </p>
-            <p className="text-xs text-yellow-700 mt-2">
-              Authentication bypassed for rapid development
-            </p>
+            <p className="text-sm text-yellow-800 font-bold">⚡ Development Mode ⚡</p>
           </div>
         )}
       </div>
-      
-      <footer className="mt-12 text-sm text-gray-500 font-medium">
-        &copy; {new Date().getFullYear()} Pret A Manger • Powered by Viam
-      </footer>
     </div>
   );
 }
@@ -90,17 +70,14 @@ function MainAppContent() {
   const [showSettings, setShowSettings] = React.useState(false);
   const [userInfo, setUserInfo] = React.useState(auth.getUserInfo());
 
-  // Real-time user info updates
+  // Update user info when it changes
   useEffect(() => {
-    const updateUserInfo = () => {
+    const interval = setInterval(() => {
       const info = auth.getUserInfo();
       if (JSON.stringify(info) !== JSON.stringify(userInfo)) {
         setUserInfo(info);
       }
-    };
-
-    updateUserInfo();
-    const interval = setInterval(updateUserInfo, 2000);
+    }, 2000);
     return () => clearInterval(interval);
   }, [userInfo]);
 
@@ -108,21 +85,16 @@ function MainAppContent() {
     push.initialize();
   }, []);
 
-  // Auto-enable demo mode for new users
   useEffect(() => {
     if (IS_DEMO && selectedStores.size === 0 && stores.length > 0) {
-      console.log('🎯 Auto-enabling demo mode for all stores');
       stores.forEach(store => toggleStoreSelection(store.id));
     }
   }, [stores, selectedStores, toggleStoreSelection]);
 
-  // Smart monitoring lifecycle
   useEffect(() => {
     if (selectedStores.size > 0) {
-      console.log(`📡 Starting monitoring for ${selectedStores.size} stores`);
       monitor.start(selectedStores);
     } else {
-      console.log('⏹️ Stopping monitoring - no stores selected');
       monitor.stop();
     }
     return () => monitor.stop();
@@ -130,7 +102,6 @@ function MainAppContent() {
 
   const handleLogout = async () => {
     setShowSettings(false);
-    console.log('🚪 User initiated logout');
     await auth.logout();
   };
 
@@ -145,7 +116,6 @@ function MainAppContent() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       
-      {/* Enhanced top-right user area */}
       <div className="fixed top-4 right-4 z-50 flex items-center space-x-3">
         {IS_AUTH_ENABLED && userInfo && (
           <div className="bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl px-4 py-2 shadow-lg flex items-center space-x-3 hover:bg-white transition-all duration-200">
@@ -171,7 +141,6 @@ function MainAppContent() {
         </button>
       </div>
       
-      {/* Enhanced settings panel */}
       {showSettings && (
         <>
           <div className="fixed top-20 right-4 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-2xl p-6 z-50 min-w-[280px] space-y-4 animate-in slide-in-from-top-2 duration-300">
@@ -246,45 +215,25 @@ function MainAppContent() {
 }
 
 function App() {
-  const [isLoading, setIsLoading] = React.useState(true);
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(true);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        console.log('🔐 Checking authentication status...');
-        const authenticated = auth.isAuthenticated();
-        console.log(`🔐 Authentication result: ${authenticated ? 'AUTHENTICATED' : 'NOT AUTHENTICATED'}`);
-        setIsAuthenticated(authenticated);
-      } catch (error) {
-        console.error('🔐 Auth check failed:', error);
-        setIsAuthenticated(false);
-      } finally {
-        setIsLoading(false);
-      }
+    // Simple, clean auth check
+    const checkAuth = () => {
+      const authenticated = auth.isAuthenticated();
+      setIsAuthenticated(authenticated);
+      setIsLoading(false);
     };
 
+    // Check immediately
     checkAuth();
     
-    // Periodic auth check with exponential backoff for performance
-    let checkInterval = 5000;
-    const authInterval = setInterval(async () => {
-      const authenticated = auth.isAuthenticated();
-      if (authenticated !== isAuthenticated) {
-        console.log('🔐 Auth state changed:', authenticated);
-      }
-      setIsAuthenticated(authenticated);
-      
-      // Reduce check frequency if authenticated
-      if (authenticated) {
-        checkInterval = Math.min(checkInterval * 1.2, 30000);
-      }
-    }, checkInterval);
-    
-    return () => clearInterval(authInterval);
-  }, [isAuthenticated]);
+    // Then check periodically
+    const interval = setInterval(checkAuth, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
-  // Beautiful loading screen
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -293,19 +242,13 @@ function App() {
             <Loader2 className="w-8 h-8 text-white animate-spin" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Pret Monitor</h2>
-          <p className="text-gray-600 animate-pulse">Initializing secure connection...</p>
+          <p className="text-gray-600">Loading...</p>
         </div>
       </div>
     );
   }
 
-  // Show login if not authenticated
-  if (!isAuthenticated) {
-    return <LoginScreen />;
-  }
-  
-  // Show main app when authenticated
-  return <MainAppContent />;
+  return isAuthenticated ? <MainAppContent /> : <LoginScreen />;
 }
 
 export default App;
