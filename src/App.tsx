@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore } from './stores/store';
 import { monitor } from './services/monitor';
 import { push } from './services/push';
-import { auth } from './services/auth';
+import { auth, UserInfo } from './services/auth';
 import { IS_DEMO, toggleDemo } from './config/stores';
 import { IS_AUTH_ENABLED } from './config/auth';
 import { Header } from './components/Header';
@@ -14,7 +14,7 @@ import { AlertsView } from './views/AlertsView';
 import { CameraView } from './views/CameraView';
 
 function LoginScreen() {
-  const [isLoading, setIsLoading] = React.useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
     setIsLoading(true);
@@ -67,19 +67,17 @@ function LoginScreen() {
 
 function MainAppContent() {
   const { currentView, selectedStores, stores, toggleStoreSelection } = useStore();
-  const [showSettings, setShowSettings] = React.useState(false);
-  const [userInfo, setUserInfo] = React.useState(auth.getUserInfo());
+  const [showSettings, setShowSettings] = useState(false);
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(auth.getUserInfo());
 
-  // Update user info when it changes
+  // Update user info when auth state changes
   useEffect(() => {
-    const interval = setInterval(() => {
-      const info = auth.getUserInfo();
-      if (JSON.stringify(info) !== JSON.stringify(userInfo)) {
-        setUserInfo(info);
-      }
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [userInfo]);
+    const handleAuthChange = () => {
+      setUserInfo(auth.getUserInfo());
+    };
+    window.addEventListener('authChange', handleAuthChange);
+    return () => window.removeEventListener('authChange', handleAuthChange);
+  }, []);
 
   useEffect(() => {
     push.initialize();
@@ -107,9 +105,7 @@ function MainAppContent() {
 
   const getUserDisplayName = () => {
     if (!userInfo) return 'User';
-    return userInfo.given_name || 
-           userInfo.email?.split('@')[0] || 
-           'User';
+    return userInfo.given_name || userInfo.name || userInfo.email?.split('@')[0] || 'User';
   };
 
   return (
@@ -119,9 +115,13 @@ function MainAppContent() {
       <div className="fixed top-4 right-4 z-50 flex items-center space-x-3">
         {IS_AUTH_ENABLED && userInfo && (
           <div className="bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl px-4 py-2 shadow-lg flex items-center space-x-3 hover:bg-white transition-all duration-200">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
-              <User className="w-4 h-4 text-white" />
-            </div>
+            {userInfo.picture ? (
+               <img src={userInfo.picture} alt="User" className="w-8 h-8 rounded-full" />
+            ) : (
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+                <User className="w-4 h-4 text-white" />
+              </div>
+            )}
             <div className="text-sm">
               <div className="font-semibold text-gray-900">
                 {getUserDisplayName()}
@@ -173,10 +173,10 @@ function MainAppContent() {
                   <p className="text-xs text-gray-500">OAuth security status</p>
                 </div>
                 <span className={`px-4 py-2 text-xs font-bold rounded-lg ${
-                  IS_AUTH_ENABLED 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-yellow-100 text-yellow-800'
-                }`}>
+                    IS_AUTH_ENABLED 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}>
                   {IS_AUTH_ENABLED ? 'SECURED' : 'DEV MODE'}
                 </span>
               </div>
@@ -215,26 +215,29 @@ function MainAppContent() {
 }
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = React.useState(false);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [authStatus, setAuthStatus] = useState({
+    loading: true,
+    authenticated: auth.isAuthenticated(),
+  });
 
   useEffect(() => {
-    // Simple, clean auth check
-    const checkAuth = () => {
-      const authenticated = auth.isAuthenticated();
-      setIsAuthenticated(authenticated);
-      setIsLoading(false);
+    const handleAuthChange = () => {
+      setAuthStatus({
+        loading: auth.isAuthenticating(),
+        authenticated: auth.isAuthenticated(),
+      });
     };
 
-    // Check immediately
-    checkAuth();
-    
-    // Then check periodically
-    const interval = setInterval(checkAuth, 3000);
-    return () => clearInterval(interval);
+    // Listen for our custom auth event
+    window.addEventListener('authChange', handleAuthChange);
+
+    // Initial check
+    handleAuthChange();
+
+    return () => window.removeEventListener('authChange', handleAuthChange);
   }, []);
 
-  if (isLoading) {
+  if (authStatus.loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
         <div className="text-center">
@@ -242,13 +245,13 @@ function App() {
             <Loader2 className="w-8 h-8 text-white animate-spin" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Pret Monitor</h2>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">Finalizing Authentication...</p>
         </div>
       </div>
     );
   }
 
-  return isAuthenticated ? <MainAppContent /> : <LoginScreen />;
+  return authStatus.authenticated ? <MainAppContent /> : <LoginScreen />;
 }
 
 export default App;
