@@ -49,8 +49,8 @@ export default async function handler(
       });
     }
 
-    // A security best practice: prevent caching of the token response
     response.setHeader('Cache-Control', 'no-store');
+    // IMPORTANT: Pass the id_token through to the client
     return response.status(200).json(tokenData);
 
   } catch (error) {
