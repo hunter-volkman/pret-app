@@ -1,33 +1,15 @@
-// Simple service worker for MVP
-const CACHE_NAME = 'pret-monitor-v1'
-const urlsToCache = [
-  '/',
-  '/manifest.json',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png'
-]
+// Simplified service worker, primarily for push notifications.
+// Caching is handled by the browser and Vercel's CDN, preventing stale asset issues.
 
-// Install
+// Install: Skip waiting to activate the new worker immediately.
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
-      .then(() => self.skipWaiting())
-  )
-})
+  self.skipWaiting();
+});
 
-// Activate
+// Activate: Ensure the new worker takes control immediately.
 self.addEventListener('activate', event => {
-  event.waitUntil(self.clients.claim())
-})
-
-// Fetch
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => response || fetch(event.request))
-  )
-})
+  event.waitUntil(self.clients.claim());
+});
 
 // Push notifications
 self.addEventListener('push', event => {
@@ -36,25 +18,28 @@ self.addEventListener('push', event => {
   const options = {
     body: data.message || 'New alert from Pret Monitor',
     icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-192x192.png',
+    badge: '/icons/icon-192x192.png', // Badge for Android
     vibrate: [100, 50, 100],
-    data: { dateOfArrival: Date.now() },
+    data: { 
+      dateOfArrival: Date.now(),
+      url: data.url || '/' 
+    },
     actions: [
       { action: 'view', title: 'View Details' },
       { action: 'dismiss', title: 'Dismiss' }
     ]
-  }
+  };
 
   event.waitUntil(
     self.registration.showNotification(title, options)
-  )
-})
+  );
+});
 
 // Notification click
 self.addEventListener('notificationclick', event => {
-  event.notification.close()
+  event.notification.close();
   
-  if (event.action === 'view') {
-    event.waitUntil(clients.openWindow('/'))
-  }
-})
+  // Open the app or a specific URL from the push data
+  const urlToOpen = event.notification.data.url || '/';
+  event.waitUntil(clients.openWindow(urlToOpen));
+});
