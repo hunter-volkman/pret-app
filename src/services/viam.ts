@@ -62,14 +62,7 @@ class ViamService {
       }
     } catch (error) {
       console.error(`[ViamService] ❌ OAuth connection failed for ${host}:`, error);
-      
-      // If OAuth fails and auth is enabled, trigger re-authentication
-      const isTokenValid = await auth.isTokenValid();
-      if (!isTokenValid && import.meta.env.VITE_AUTH_ENABLED !== 'false') {
-        console.log('[ViamService] 🔄 Token invalid, triggering re-authentication...');
-        setTimeout(() => auth.login(), 1000);
-        return null;
-      }
+      // The auth service will handle re-authentication automatically. No need for logic here.
     }
 
     // Priority 2: Fallback to dev credentials in development
@@ -92,7 +85,9 @@ class ViamService {
       }
     }
 
-    console.error('[ViamService] ❌ No valid authentication method available');
+    // If we're here in production, it means getAccessToken() returned null.
+    // The auth service has already triggered a logout, so we just fail gracefully.
+    console.error(`[ViamService] ❌ No valid authentication method available for ${host}.`);
     return null;
   }
 
