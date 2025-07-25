@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from './stores/store';
 import { monitor } from './services/monitor';
 import { push } from './services/push';
