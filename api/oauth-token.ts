@@ -1,71 +1,60 @@
-import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(
   request: VercelRequest,
   response: VercelResponse,
 ) {
-  // Only allow POST requests
   if (request.method !== 'POST') {
     return response.status(405).json({ error: 'Method Not Allowed' });
   }
 
+  const { code, codeVerifier, redirectUri } = request.body;
+  const clientId = process.env.VITE_VIAM_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.VIAM_OAUTH_CLIENT_SECRET;
+
+  if (!code || !codeVerifier || !redirectUri) {
+    return response.status(400).json({ error: 'Missing required parameters.' });
+  }
+
+  if (!clientId || !clientSecret) {
+    console.error('[API OAuth] Server not configured with OAuth credentials.');
+    return response.status(500).json({ error: 'Authentication service not configured.' });
+  }
+
+  const tokenUrl = 'https://auth.viam.com/oauth2/token';
+
+  const params = new URLSearchParams();
+  params.append('grant_type', 'authorization_code');
+  params.append('client_id', clientId);
+  params.append('client_secret', clientSecret);
+  params.append('code', code);
+  params.append('redirect_uri', redirectUri);
+  params.append('code_verifier', codeVerifier);
+
   try {
-    const { code, codeVerifier, redirectUri } = request.body;
-    
-    if (!code || !codeVerifier || !redirectUri) {
-      return response.status(400).json({ 
-        error: 'Missing required parameters: code, codeVerifier, redirectUri' 
-      });
-    }
-
-    const clientId = process.env.VITE_VIAM_OAUTH_CLIENT_ID;
-    
-    if (!clientId) {
-      console.error('Missing VITE_VIAM_OAUTH_CLIENT_ID in environment');
-      return response.status(500).json({ error: 'OAuth configuration missing' });
-    }
-
-    console.log('🔄 Exchanging authorization code for tokens...');
-
-    // Exchange code for tokens with Viam's token endpoint
-    const tokenResponse = await fetch('https://auth.viam.com/oauth2/token', {
+    const tokenResponse = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        client_id: clientId,
-        redirect_uri: redirectUri,
-        code_verifier: codeVerifier,
-      }),
+      body: params,
     });
 
     const tokenData = await tokenResponse.json();
 
     if (!tokenResponse.ok) {
-      console.error('❌ Viam token exchange failed:', tokenData);
-      return response.status(tokenResponse.status).json({ 
-        error: 'Token exchange failed',
-        details: tokenData 
+      console.error('[API OAuth] Token exchange failed:', tokenData);
+      return response.status(tokenResponse.status).json({
+        error: tokenData.error_description || 'Failed to exchange code for token.',
       });
     }
 
-    console.log('✅ Token exchange successful');
-
-    return response.status(200).json({
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
-      expires_in: tokenData.expires_in,
-      token_type: tokenData.token_type,
-    });
+    // A security best practice: prevent caching of the token response
+    response.setHeader('Cache-Control', 'no-store');
+    return response.status(200).json(tokenData);
 
   } catch (error) {
-    console.error('❌ OAuth Token Exchange Error:', error);
+    console.error('[API OAuth Error]', error);
     return response.status(500).json({ error: 'Internal Server Error' });
   }
 }
