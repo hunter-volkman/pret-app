@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: './',
+  base: '/', // Use root base path for proper asset linking
   build: {
     outDir: 'build',
     rollupOptions: {
@@ -13,7 +13,7 @@ export default defineConfig({
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
         manualChunks: {
-          vendor: ['react', 'react-dom'],
+          vendor: ['react', 'react-dom', 'react-router-dom', 'leaflet'],
           viam: ['@viamrobotics/sdk']
         }
       }
