@@ -6,7 +6,7 @@ import { auth, UserInfo } from './services/auth';
 import { IS_DEMO } from './config/stores';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
-import { Loader2, Shield } from 'lucide-react';
+import { Loader2, Shield, Star } from 'lucide-react'; // Added Star
 import { StoresView } from './views/StoresView';
 import { MapView } from './views/MapView';
 import { AlertsView } from './views/AlertsView';
@@ -26,36 +26,42 @@ function LoginScreen() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
-      <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-10 max-w-md w-full text-center border border-white/20">
-        <div className="w-20 h-20 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 rounded-2xl mx-auto mb-8 flex items-center justify-center shadow-lg">
-          <span className="text-white font-black text-2xl">P</span>
-        </div>
-        
-        <h1 className="text-4xl font-black text-gray-900 mb-3 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-          Pret Monitor
-        </h1>
-        <p className="text-gray-600 mb-8 text-lg">
-          Real-time Fleet Operations Dashboard
-        </p>
-        
-        <button
-          onClick={handleLogin}
-          disabled={isLoading}
-          className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-bold py-4 px-8 rounded-2xl flex items-center justify-center space-x-3 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98]"
-        >
-          {isLoading ? (
-            <Loader2 className="w-6 h-6 animate-spin" />
-          ) : (
-            <Shield className="w-6 h-6" />
-          )}
-          <span className="text-lg">
-            {isLoading ? 'Connecting...' : 'Sign In with Viam'}
-          </span>
-        </button>
-      </div>
-    </div>
-  );
+    <div className="flex flex-col items-center justify-center min-h-dvh bg-gray-50 text-gray-800 p-8">
+      <div className="flex-1 flex flex-col items-center justify-center text-center">
+        {/* Logo and Title */}
+        <div className="flex items-center space-x-4 mb-4">
+          <Star className="w-12 h-12 text-pret-red" fill="currentColor" />
+          <h1 className="text-5xl font-bold tracking-tight">Pret Monitor</h1>
+        </div>
+        <p className="text-gray-500 text-lg mb-12">
+          Real-time Fleet Operations Dashboard
+        </p>
+
+        {/* Login Button */}
+        <button
+          onClick={handleLogin}
+          disabled={isLoading}
+          className="w-full max-w-sm bg-gray-800 text-white font-semibold py-4 px-8 rounded-xl flex items-center justify-center space-x-3 hover:bg-gray-900 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-100"
+        >
+          {isLoading ? (
+            <Loader2 className="w-6 h-6 animate-spin" />
+          ) : (
+            <Shield className="w-6 h-6" />
+          )}
+          <span className="text-lg">
+            {isLoading ? 'Connecting...' : 'Sign In with Viam'}
+          </span>
+        </button>
+      </div>
+
+      {/* Footer */}
+      <div className="text-center text-gray-500 text-xs">
+        <img src="/powered-by-viam.png" alt="Powered by Viam" className="h-4 w-auto mx-auto mb-2 opacity-50" />
+        <p>By using this app, you agree to our Privacy Policy.</p>
+        <p className="mt-1">Version 1.0.0</p>
+      </div>
+    </div>
+  );
 }
 
 function MainAppContent() {
@@ -135,13 +141,12 @@ function App() {
 
   if (authStatus.loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl mx-auto mb-6 flex items-center justify-center">
-            <Loader2 className="w-8 h-8 text-white animate-spin" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Pret Monitor</h2>
-          <p className="text-gray-600">Finalizing Authentication...</p>
+          <div className="flex items-center space-x-3 text-gray-700">
+            <Loader2 className="w-6 h-6 animate-spin" />
+            <span className="text-lg font-medium">Authenticating...</span>
+          </div>
         </div>
       </div>
     );
