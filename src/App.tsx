@@ -14,244 +14,244 @@ import { AlertsView } from './views/AlertsView';
 import { CameraView } from './views/CameraView';
 
 function LoginScreen() {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = async () => {
-    setIsLoading(true);
-    try {
-      await auth.login();
-    } catch (error) {
-      console.error('Login failed:', error);
-      setIsLoading(false);
-    }
-  };
+  const handleLogin = async () => {
+    setIsLoading(true);
+    try {
+      await auth.login();
+    } catch (error) {
+      console.error('Login failed:', error);
+      setIsLoading(false);
+    }
+  };
 
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
-      <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-10 max-w-md w-full text-center border border-white/20">
-        <div className="w-20 h-20 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 rounded-2xl mx-auto mb-8 flex items-center justify-center shadow-lg">
-          <span className="text-white font-black text-2xl">P</span>
-        </div>
-        
-        <h1 className="text-4xl font-black text-gray-900 mb-3 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-          Pret Monitor
-        </h1>
-        <p className="text-gray-600 mb-8 text-lg">
-          Real-time Fleet Operations Dashboard
-        </p>
-        
-        <button
-          onClick={handleLogin}
-          disabled={isLoading}
-          className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-bold py-4 px-8 rounded-2xl flex items-center justify-center space-x-3 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98]"
-        >
-          {isLoading ? (
-            <Loader2 className="w-6 h-6 animate-spin" />
-          ) : (
-            <Shield className="w-6 h-6" />
-          )}
-          <span className="text-lg">
-            {isLoading ? 'Connecting...' : 'Sign In with Viam'}
-          </span>
-        </button>
-        
-        {!IS_AUTH_ENABLED && (
-          <div className="mt-8 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-2xl">
-            <p className="text-sm text-yellow-800 font-bold">⚡ Development Mode ⚡</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
+      <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-10 max-w-md w-full text-center border border-white/20">
+        <div className="w-20 h-20 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 rounded-2xl mx-auto mb-8 flex items-center justify-center shadow-lg">
+          <span className="text-white font-black text-2xl">P</span>
+        </div>
+        
+        <h1 className="text-4xl font-black text-gray-900 mb-3 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          Pret Monitor
+        </h1>
+        <p className="text-gray-600 mb-8 text-lg">
+          Real-time Fleet Operations Dashboard
+        </p>
+        
+        <button
+          onClick={handleLogin}
+          disabled={isLoading}
+          className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-bold py-4 px-8 rounded-2xl flex items-center justify-center space-x-3 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98]"
+        >
+          {isLoading ? (
+            <Loader2 className="w-6 h-6 animate-spin" />
+          ) : (
+            <Shield className="w-6 h-6" />
+          )}
+          <span className="text-lg">
+            {isLoading ? 'Connecting...' : 'Sign In with Viam'}
+          </span>
+        </button>
+        
+        {!IS_AUTH_ENABLED && (
+          <div className="mt-8 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-2xl">
+            <p className="text-sm text-yellow-800 font-bold">⚡ Development Mode ⚡</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function MainAppContent() {
-  const { currentView, selectedStores, stores, toggleStoreSelection } = useStore();
-  const [showSettings, setShowSettings] = useState(false);
-  const [userInfo, setUserInfo] = useState<UserInfo | null>(auth.getUserInfo());
+  const { currentView, selectedStores, stores, toggleStoreSelection } = useStore();
+  const [showSettings, setShowSettings] = useState(false);
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(auth.getUserInfo());
 
-  // Update user info when auth state changes
-  useEffect(() => {
-    const handleAuthChange = () => {
-      setUserInfo(auth.getUserInfo());
-    };
-    window.addEventListener('authChange', handleAuthChange);
-    return () => window.removeEventListener('authChange', handleAuthChange);
-  }, []);
+  // Update user info when auth state changes
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setUserInfo(auth.getUserInfo());
+    };
+    window.addEventListener('authChange', handleAuthChange);
+    return () => window.removeEventListener('authChange', handleAuthChange);
+  }, []);
 
-  useEffect(() => {
-    push.initialize();
-  }, []);
+  useEffect(() => {
+    push.initialize();
+  }, []);
 
-  useEffect(() => {
-    if (IS_DEMO && selectedStores.size === 0 && stores.length > 0) {
-      stores.forEach(store => toggleStoreSelection(store.id));
-    }
-  }, [stores, selectedStores, toggleStoreSelection]);
+  useEffect(() => {
+    if (IS_DEMO && selectedStores.size === 0 && stores.length > 0) {
+      stores.forEach(store => toggleStoreSelection(store.id));
+    }
+  }, [stores, selectedStores, toggleStoreSelection]);
 
-  useEffect(() => {
-    if (selectedStores.size > 0) {
-      monitor.start(selectedStores);
-    } else {
-      monitor.stop();
-    }
-    return () => monitor.stop();
-  }, [selectedStores]);
+  useEffect(() => {
+    if (selectedStores.size > 0) {
+      monitor.start(selectedStores);
+    } else {
+      monitor.stop();
+    }
+    return () => monitor.stop();
+  }, [selectedStores]);
 
-  const handleLogout = async () => {
-    setShowSettings(false);
-    await auth.logout();
-  };
+  const handleLogout = async () => {
+    setShowSettings(false);
+    await auth.logout();
+  };
 
-  const getUserDisplayName = () => {
-    if (!userInfo) return 'User';
-    return userInfo.given_name || userInfo.name || userInfo.email?.split('@')[0] || 'User';
-  };
+  const getUserDisplayName = () => {
+    if (!userInfo) return 'User';
+    return userInfo.given_name || userInfo.name || userInfo.email?.split('@')[0] || 'User';
+  };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      
-      <div className="fixed top-4 right-4 z-50 flex items-center space-x-3">
-        {IS_AUTH_ENABLED && userInfo && (
-          <div className="bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl px-4 py-2 shadow-lg flex items-center space-x-3 hover:bg-white transition-all duration-200">
-            {userInfo.picture ? (
-               <img src={userInfo.picture} alt="User" className="w-8 h-8 rounded-full" />
-            ) : (
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
-                <User className="w-4 h-4 text-white" />
-              </div>
-            )}
-            <div className="text-sm">
-              <div className="font-semibold text-gray-900">
-                {getUserDisplayName()}
-              </div>
-              <div className="text-xs text-gray-500">
-                {userInfo.email}
-              </div>
-            </div>
-          </div>
-        )}
-        
-        <button
-          onClick={() => setShowSettings(!showSettings)}
-          className="p-3 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl shadow-lg hover:bg-white hover:shadow-xl transition-all duration-200 group"
-        >
-          <Settings className="w-5 h-5 text-gray-600 group-hover:rotate-90 transition-transform duration-300" />
-        </button>
-      </div>
-      
-      {showSettings && (
-        <>
-          <div className="fixed top-20 right-4 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-2xl p-6 z-50 min-w-[280px] space-y-4 animate-in slide-in-from-top-2 duration-300">
-            <h3 className="font-bold text-gray-900 text-lg flex items-center space-x-2">
-              <Settings className="w-5 h-5" />
-              <span>Settings</span>
-            </h3>
-            
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                <div>
-                  <span className="text-sm font-medium text-gray-700">Demo Mode</span>
-                  <p className="text-xs text-gray-500">Auto-select all stores</p>
-                </div>
-                <button
-                  onClick={toggleDemo}
-                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 ${
-                    IS_DEMO 
-                      ? 'bg-blue-500 text-white shadow-lg' 
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  {IS_DEMO ? 'ON' : 'OFF'}
-                </button>
-              </div>
-              
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                <div>
-                  <span className="text-sm font-medium text-gray-700">Authentication</span>
-                  <p className="text-xs text-gray-500">OAuth security status</p>
-                </div>
-                <span className={`px-4 py-2 text-xs font-bold rounded-lg ${
-                    IS_AUTH_ENABLED 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                  {IS_AUTH_ENABLED ? 'SECURED' : 'DEV MODE'}
-                </span>
-              </div>
-              
-              {IS_AUTH_ENABLED && (
-                <>
-                  <div className="border-t border-gray-200 my-4" />
-                  <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center justify-center space-x-2 text-red-600 hover:text-red-700 hover:bg-red-50 p-3 rounded-xl transition-all duration-200 font-medium"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    <span>Sign Out</span>
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-          <div 
-            className="fixed inset-0 z-40 bg-black/10 backdrop-blur-[1px]" 
-            onClick={() => setShowSettings(false)} 
-          />
-        </>
-      )}
+  return (
+    <div className="h-dvh flex flex-col bg-gray-50">
+      <Header />
+      
+      <div className="fixed top-4 right-4 z-50 flex items-center space-x-3">
+        {IS_AUTH_ENABLED && userInfo && (
+          <div className="bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl px-4 py-2 shadow-lg flex items-center space-x-3 hover:bg-white transition-all duration-200">
+            {userInfo.picture ? (
+               <img src={userInfo.picture} alt="User" className="w-8 h-8 rounded-full" />
+            ) : (
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+                <User className="w-4 h-4 text-white" />
+              </div>
+            )}
+            <div className="text-sm">
+              <div className="font-semibold text-gray-900">
+                {getUserDisplayName()}
+              </div>
+              <div className="text-xs text-gray-500">
+                {userInfo.email}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <button
+          onClick={() => setShowSettings(!showSettings)}
+          className="p-3 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl shadow-lg hover:bg-white hover:shadow-xl transition-all duration-200 group"
+        >
+          <Settings className="w-5 h-5 text-gray-600 group-hover:rotate-90 transition-transform duration-300" />
+        </button>
+      </div>
+      
+      {showSettings && (
+        <>
+          <div className="fixed top-20 right-4 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-2xl p-6 z-50 min-w-[280px] space-y-4 animate-in slide-in-from-top-2 duration-300">
+            <h3 className="font-bold text-gray-900 text-lg flex items-center space-x-2">
+              <Settings className="w-5 h-5" />
+              <span>Settings</span>
+            </h3>
+            
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Demo Mode</span>
+                  <p className="text-xs text-gray-500">Auto-select all stores</p>
+                </div>
+                <button
+                  onClick={toggleDemo}
+                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 ${
+                    IS_DEMO 
+                      ? 'bg-blue-500 text-white shadow-lg' 
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {IS_DEMO ? 'ON' : 'OFF'}
+                </button>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Authentication</span>
+                  <p className="text-xs text-gray-500">OAuth security status</p>
+                </div>
+                <span className={`px-4 py-2 text-xs font-bold rounded-lg ${
+                    IS_AUTH_ENABLED 
+                      ? 'bg-green-100 text-green-800' 
+              _ECHO_OFF       : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                  {IS_AUTH_ENABLED ? 'SECURED' : 'DEV MODE'}
+                </span>
+              </div>
+              
+              {IS_AUTH_ENABLED && (
+                <>
+                  <div className="border-t border-gray-200 my-4" />
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center justify-center space-x-2 text-red-600 hover:text-red-700 hover:bg-red-50 p-3 rounded-xl transition-all duration-200 font-medium"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Sign Out</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+          <div 
+            className="fixed inset-0 z-40 bg-black/10 backdrop-blur-[1px]" 
+            onClick={() => setShowSettings(false)} 
+          />
+        </>
+      )}
 
-      <main className="pb-24">
-        {currentView === 'stores' && <StoresView />}
-        {currentView === 'map' && <MapView />}
-        {currentView === 'alerts' && <AlertsView />}
-        {currentView === 'camera' && <CameraView />}
-      </main>
+      <main className="flex-1 overflow-y-auto">
+        {currentView === 'stores' && <StoresView />}
+        {currentView === 'map' && <MapView />}
+        {currentView === 'alerts' && <AlertsView />}
+        {currentView === 'camera' && <CameraView />}
+      </main>
 
-      <Navigation />
-    </div>
-  );
+      <Navigation />
+    </div>
+  );
 }
 
 function App() {
-  const [authStatus, setAuthStatus] = useState({
-    loading: true,
-    authenticated: auth.isAuthenticated(),
-  });
+  const [authStatus, setAuthStatus] = useState({
+    loading: true,
+    authenticated: auth.isAuthenticated(),
+  });
 
-  useEffect(() => {
-    const handleAuthChange = () => {
-      setAuthStatus({
-        loading: auth.isAuthenticating(),
-        authenticated: auth.isAuthenticated(),
-      });
-    };
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setAuthStatus({
+        loading: auth.isAuthenticating(),
+        authenticated: auth.isAuthenticated(),
+      });
+    };
 
-    // Listen for our custom auth event
-    window.addEventListener('authChange', handleAuthChange);
+    // Listen for our custom auth event
+    window.addEventListener('authChange', handleAuthChange);
 
-    // Initial check
-    handleAuthChange();
+    // Initial check
+    handleAuthChange();
 
-    return () => window.removeEventListener('authChange', handleAuthChange);
-  }, []);
+    return () => window.removeEventListener('authChange', handleAuthChange);
+  }, []);
 
-  if (authStatus.loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl mx-auto mb-6 flex items-center justify-center">
-            <Loader2 className="w-8 h-8 text-white animate-spin" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Pret Monitor</h2>
-          <p className="text-gray-600">Finalizing Authentication...</p>
-        </div>
-      </div>
-    );
-  }
+  if (authStatus.loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl mx-auto mb-6 flex items-center justify-center">
+            <Loader2 className="w-8 h-8 text-white animate-spin" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Pret Monitor</h2>
+          <p className="text-gray-600">Finalizing Authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
-  return authStatus.authenticated ? <MainAppContent /> : <LoginScreen />;
+  return authStatus.authenticated ? <MainAppContent /> : <LoginScreen />;
 }
 
 export default App;
