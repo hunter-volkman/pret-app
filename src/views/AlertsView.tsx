@@ -36,7 +36,7 @@ export function AlertsView() {
   
   if (alerts.length === 0) {
     return (
-      <div className="p-6 pb-28">
+      <div className="p-6">
         <div className="text-center py-16">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-8 h-8 text-green-600" />
@@ -49,7 +49,7 @@ export function AlertsView() {
   }
   
   return (
-    <div className="p-6 pb-28">
+    <div className="p-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Alerts</h2>
