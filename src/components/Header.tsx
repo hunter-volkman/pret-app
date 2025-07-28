@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Bell, Wifi, WifiOff, Settings, LogOut, User } from 'lucide-react';
-import { useStore, unreadCount } from '../stores/store';
+import { Wifi, WifiOff, Settings, LogOut, User } from 'lucide-react';
+import { useStore } from '../stores/store';
 import { UserInfo } from '../services/auth';
 import { IS_DEMO, toggleDemo } from '../config/stores';
 import { IS_AUTH_ENABLED } from '../config/auth';
@@ -12,7 +12,6 @@ interface HeaderProps {
 
 export function Header({ userInfo, onLogout }: HeaderProps) {
   const { stores } = useStore();
-  const alertCount = unreadCount();
   const [showSettings, setShowSettings] = useState(false);
 
   const onlineStores = stores.filter(store => store.status === 'online').length;
@@ -37,46 +36,39 @@ export function Header({ userInfo, onLogout }: HeaderProps) {
         </div>
         
         {/* Right Side: All Controls */}
-        <div className="flex items-center space-x-2 sm:space-x-4">
-          {/* Online Stores Count */}
-          <div className="hidden md:flex items-center space-x-2">
+        <div className="flex items-center space-x-3 sm:space-x-4">
+          {/* Online Stores Count - ALWAYS VISIBLE */}
+          <div className="flex items-center space-x-2">
             {onlineStores > 0 ? (
               <Wifi className="w-4 h-4 text-green-500" />
             ) : (
               <WifiOff className="w-4 h-4 text-red-500" />
             )}
-            <span className="text-sm text-gray-600">
-              {onlineStores}/{stores.length} online
+            <span className="text-sm font-medium text-gray-700">
+              {onlineStores}/{stores.length}
+              <span className="hidden sm:inline"> online</span>
             </span>
           </div>
-          
-          {/* Alerts Count Badge */}
-          {alertCount > 0 && (
-            <div className="flex items-center space-x-2 bg-red-50 text-red-700 px-3 py-1 rounded-full">
-              <Bell className="w-4 h-4" />
-              <span className="text-sm font-medium">{alertCount}</span>
-            </div>
-          )}
 
           {/* User Info & Settings Button */}
           {IS_AUTH_ENABLED && userInfo && (
              <div className="flex items-center space-x-2">
-                <div className="bg-white border border-gray-200 rounded-full p-1 pl-2 flex items-center space-x-2">
-                    {userInfo.picture ? (
-                       <img src={userInfo.picture} alt="User" className="w-7 h-7 rounded-full" />
-                    ) : (
-                      <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
-                        <User className="w-4 h-4 text-white" />
-                      </div>
-                    )}
-                    <div className="text-sm hidden sm:block">
-                      <div className="font-semibold text-gray-900 leading-tight">
+                <div className="bg-white border border-gray-200 rounded-full p-1 pl-3 pr-2 flex items-center space-x-3">
+                    <div className="text-sm text-right">
+                      <div className="font-semibold text-gray-900 leading-tight truncate">
                         {getUserDisplayName()}
                       </div>
-                      <div className="text-xs text-gray-500 leading-tight">
+                      <div className="text-xs text-gray-500 leading-tight truncate hidden sm:block">
                         {userInfo.email}
                       </div>
                     </div>
+                    {userInfo.picture ? (
+                       <img src={userInfo.picture} alt="User" className="w-8 h-8 rounded-full" />
+                    ) : (
+                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
+                        <User className="w-4 h-4 text-white" />
+                      </div>
+                    )}
                 </div>
 
                 {/* Settings Dropdown */}
