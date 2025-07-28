@@ -129,7 +129,7 @@ export function CameraView() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
-          <button onClick={() => setCurrentView('stores')} className="p-2 hover:bg-gray-100 rounded-lg">
+          <button onClick={() => setCurrentStore(null)} className="p-2 hover:bg-gray-100 rounded-lg">
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </button>
           <div>
