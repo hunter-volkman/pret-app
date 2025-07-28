@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Wifi, WifiOff, Settings, LogOut, User } from 'lucide-react';
+import { Wifi, WifiOff, Settings, LogOut, User, Send } from 'lucide-react';
 import { useStore } from '../stores/store';
 import { UserInfo } from '../services/auth';
 import { IS_DEMO, toggleDemo } from '../config/stores';
@@ -11,7 +11,7 @@ interface HeaderProps {
 }
 
 export function Header({ userInfo, onLogout }: HeaderProps) {
-  const { stores } = useStore();
+  const { stores, notificationSubscriptions } = useStore();
   const [showSettings, setShowSettings] = useState(false);
 
   const onlineStores = stores.filter(store => store.status === 'online').length;
@@ -19,6 +19,40 @@ export function Header({ userInfo, onLogout }: HeaderProps) {
   const handleLogout = async () => {
     setShowSettings(false);
     await onLogout();
+  };
+  
+  const handleSendTestNotification = async () => {
+    // Find the first store the user is subscribed to
+    const subscribedStoreId = Array.from(notificationSubscriptions)[0] as string | undefined;
+
+    if (!subscribedStoreId) {
+      alert("Please subscribe to at least one store's notifications (using the bell icon) to send a test.");
+      return;
+    }
+
+    console.log(`[UI Test] Sending test notification for store: ${subscribedStoreId}`);
+    try {
+      const response = await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          storeId: subscribedStoreId,
+          title: '🔔 Test Notification',
+          message: `This is a test alert for one of your subscribed stores.`
+        }),
+      });
+      
+      if (response.ok) {
+        alert("Test notification sent successfully! You should receive it shortly.");
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to send test notification. Server responded with status ${response.status}: ${errorData.error || 'Unknown Error'}`);
+      }
+    } catch (error) {
+      console.error('Failed to send test notification:', error);
+      alert('An error occurred while sending the test notification. Check the console.');
+    }
+    setShowSettings(false);
   };
 
   const getUserDisplayName = () => {
@@ -100,6 +134,14 @@ export function Header({ userInfo, onLogout }: HeaderProps) {
                             {IS_DEMO ? 'ON' : 'OFF'}
                           </button>
                         </div>
+
+                        <button
+                          onClick={handleSendTestNotification}
+                          className="w-full flex items-center justify-center space-x-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-2 rounded-xl transition-colors font-medium"
+                        >
+                          <Send className="w-4 h-4" />
+                          <span>Send Test Notification</span>
+                        </button>
                         
                         <div className="border-t border-gray-200 !my-2" />
                         <button
