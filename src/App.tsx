@@ -175,7 +175,7 @@ function MainAppContent() {
                 <span className={`px-4 py-2 text-xs font-bold rounded-lg ${
                     IS_AUTH_ENABLED 
                       ? 'bg-green-100 text-green-800' 
-              _ECHO_OFF       : 'bg-yellow-100 text-yellow-800'
+                      : 'bg-yellow-100 text-yellow-800'
                   }`}>
                   {IS_AUTH_ENABLED ? 'SECURED' : 'DEV MODE'}
                 </span>
@@ -183,7 +183,7 @@ function MainAppContent() {
               
               {IS_AUTH_ENABLED && (
                 <>
-                  <div className="border-t border-gray-200 my-4" />
+              _ECHO_OFF   <div className="border-t border-gray-200 my-4" />
                   <button
                     onClick={handleLogout}
                     className="w-full flex items-center justify-center space-x-2 text-red-600 hover:text-red-700 hover:bg-red-50 p-3 rounded-xl transition-all duration-200 font-medium"
