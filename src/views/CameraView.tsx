@@ -101,7 +101,7 @@ export function CameraView() {
 
   if (!currentStore) {
     return (
-      <div className="p-6 pb-28">
+      <div className="p-6">
         <div className="text-center py-8">
           <Camera className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900 mb-2">No Store Selected</h3>
@@ -126,7 +126,7 @@ export function CameraView() {
   const isUpgrading = previewUrl && !isStreamReady;
 
   return (
-    <div className="p-6 pb-28">
+    <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
           <button onClick={() => setCurrentView('stores')} className="p-2 hover:bg-gray-100 rounded-lg">
