@@ -1,10 +1,10 @@
 import { viam } from './viam'
-import { useStore } from '../stores/store'
+import { useStore, Alert } from '../stores/store'
 import { STORES } from '../config/stores'
 import { Store } from '../config/stores'
 
 class MonitorService {
-  private intervals = new Map<string, NodeJS.Timeout>()
+  private intervals = new Map<string, NodeJS.Timeout>()
 
   public start(selectedStores: Set<string>): void {
     this.stop()
@@ -50,12 +50,34 @@ class MonitorService {
     this.checkAlerts(store, stockRegions, tempSensors);
   }
   
+  /**
+   * Triggers a push notification by sending the alert details to our backend API.
+   * @param alert The alert object to send a notification for.
+   */
+  private async triggerPushNotification(alert: Alert) {
+    try {
+      console.log(`[Monitor] Triggering push notification for store: ${alert.storeId}`);
+      await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          storeId: alert.storeId,
+          title: alert.title,
+          message: alert.message,
+        }),
+      });
+    } catch (error) {
+      console.error('[Monitor] Failed to send push notification:', error);
+    }
+  }
+
   private async checkAlerts(store: Store, stockRegions: any[], tempSensors: any[]): Promise<void> {
     const { alerts, addAlert } = useStore.getState();
-    const recentAlertCutoff = Date.now() - (5 * 60 * 1000);
+    const recentAlertCutoff = Date.now() - (5 * 60 * 1000); // 5 minutes ago
 
+    // Check for stock alerts
     const lowStock = stockRegions.filter(r => r.status === 'empty' || r.status === 'low');
-    if (lowStock.length > 2) {
+    if (lowStock.length > 2) { // Trigger if more than 2 regions are low/empty
       const hasRecentStockAlert = alerts.some(a => 
         a.storeId === store.id && a.type === 'stock' && a.timestamp.getTime() > recentAlertCutoff
       );
@@ -66,7 +88,7 @@ class MonitorService {
           viam.getCameraImage(store.stockMachineId, true)
         ]);
 
-        addAlert({
+        const newAlert: Alert = {
           id: `stock-${store.id}-${Date.now()}`,
           storeId: store.id,
           storeName: store.name,
@@ -79,10 +101,14 @@ class MonitorService {
           regions: lowStock.map(r => r.id),
           imageUrl: imageUrl || undefined,
           cvImageUrl: cvImageUrl || undefined
-        });
+        };
+        
+        addAlert(newAlert);
+        this.triggerPushNotification(newAlert); // 👈 NOTIFICATION SENT
       }
     }
 
+    // Check for temperature alerts
     const tempIssues = tempSensors.filter(t => t.status !== 'normal');
     if (tempIssues.length > 0) {
       const hasRecentTempAlert = alerts.some(a => 
@@ -91,7 +117,7 @@ class MonitorService {
       
       if (!hasRecentTempAlert) {
         const criticalIssues = tempIssues.filter(t => t.status === 'critical');
-        addAlert({
+        const newAlert: Alert = {
           id: `temp-${store.id}-${Date.now()}`,
           storeId: store.id,
           storeName: store.name,
@@ -102,7 +128,10 @@ class MonitorService {
           severity: criticalIssues.length > 0 ? 'high' : 'medium',
           read: false,
           sensors: tempIssues.map(t => t.id)
-        });
+        };
+
+        addAlert(newAlert);
+        this.triggerPushNotification(newAlert); // 👈 NOTIFICATION SENT
       }
     }
   }
