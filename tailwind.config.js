@@ -16,6 +16,7 @@ module.exports = {
         pret: {
           red: '#DC2626',
           'red-dark': '#B91C1C',
+          maroon: '#a11c33',
         },
         success: '#10B981',
         warning: '#F59E0B',
