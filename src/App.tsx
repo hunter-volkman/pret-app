@@ -3,7 +3,7 @@ import { useStore } from './stores/store';
 import { monitor } from './services/monitor';
 import { push } from './services/push';
 import { auth, UserInfo } from './services/auth';
-import { IS_DEMO } from './config/stores';
+import { IS_DEMO, STORES } from './config/stores';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
 import { Loader2, Shield } from 'lucide-react';
@@ -11,6 +11,7 @@ import { StoresView } from './views/StoresView';
 import { MapView } from './views/MapView';
 import { AlertsView } from './views/AlertsView';
 import { CameraView } from './views/CameraView';
+import { viam } from './services/viam';
 
 function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
@@ -61,7 +62,7 @@ function LoginScreen() {
 }
 
 function MainAppContent() {
-  const { currentView, selectedStores, stores, toggleStoreSelection } = useStore();
+  const { currentView, selectedStores, stores, toggleStoreSelection, updateStore } = useStore();
   const [userInfo, setUserInfo] = useState<UserInfo | null>(auth.getUserInfo());
 
   // Update user info when auth state changes
@@ -72,6 +73,28 @@ function MainAppContent() {
     window.addEventListener('authChange', handleAuthChange);
     return () => window.removeEventListener('authChange', handleAuthChange);
   }, []);
+
+  // Global health check loop
+  useEffect(() => {
+    const healthCheck = async () => {
+      console.log('🩺 [HealthCheck] Running global status check...');
+      for (const store of STORES) {
+        // A store is online if its primary machine is reachable. We'll use stockMachineId.
+        const status = await viam.checkMachineStatus(store.stockMachineId);
+        
+        // Only update if the status has changed to prevent unnecessary re-renders
+        const currentStore = useStore.getState().stores.find(s => s.id === store.id);
+        if (currentStore && currentStore.status !== status) {
+          updateStore(store.id, { status });
+        }
+      }
+    };
+
+    healthCheck(); // Run immediately on mount
+    const intervalId = setInterval(healthCheck, 60000); // Run every 60 seconds
+
+    return () => clearInterval(intervalId);
+  }, [updateStore]);
 
   useEffect(() => {
     push.initialize();
