@@ -63,7 +63,6 @@ class ViamService {
       }
     } catch (error) {
       console.error(`[ViamService] ❌ OAuth connection failed for ${host}:`, error);
-      // The auth service will handle re-authentication automatically. No need for logic here.
     }
 
     // Priority 2: Fallback to dev credentials in development
@@ -87,16 +86,23 @@ class ViamService {
           return client;
         }
       } catch (error) {
-        // This will gracefully fail in production (where the file doesn't exist)
-        // or if the connection fails in dev.
         console.error(`[ViamService] ❌ Dev credentials not used or failed:`, error);
       }
     }
 
-    // If we're here in production, it means getAccessToken() returned null.
-    // The auth service has already triggered a logout, so we just fail gracefully.
     console.error(`[ViamService] ❌ No valid authentication method available for ${host}.`);
     return null;
+  }
+
+  async checkMachineStatus(machineId: string): Promise<'online' | 'offline'> {
+    const client = await this.connect(machineId);
+    if (client) {
+      // The connection succeeded, so it's online.
+      // Immediately disconnect to free up the connection resource.
+      this.disconnect(machineId);
+      return 'online';
+    }
+    return 'offline';
   }
 
   async getStockReadings(machineId: string): Promise<StockRegion[]> {
