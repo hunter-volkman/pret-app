@@ -1,11 +1,12 @@
 import * as VIAM from '@viamrobotics/sdk';
-import { DEV_VIAM_CREDENTIALS } from '../config/dev-credentials';
 import { StockRegion, TempSensor } from '../stores/store';
 import { auth } from './auth';
 
-const USE_DEV_CREDS = import.meta.env.DEV && 
-  DEV_VIAM_CREDENTIALS?.apiKeyId && 
-  DEV_VIAM_CREDENTIALS.apiKeyId !== 'PASTE_YOUR_API_KEY_ID_HERE';
+/**
+ * ViamService provides methods to interact with Viam's robotics platform.
+ * It handles connecting to robots, fetching stock and temperature readings,
+ * and managing camera streams.
+ */
 
 class ViamService {
   private clients = new Map<string, VIAM.RobotClient>();
@@ -66,22 +67,29 @@ class ViamService {
     }
 
     // Priority 2: Fallback to dev credentials in development
-    if (USE_DEV_CREDS) {
+    if (import.meta.env.DEV) {
       try {
-        const client = await VIAM.createRobotClient({
-          host,
-          credentials: {
-            type: 'api-key',
-            payload: DEV_VIAM_CREDENTIALS.apiKey,
-            authEntity: DEV_VIAM_CREDENTIALS.apiKeyId,
-          },
-          signalingAddress: 'https://app.viam.com:443',
-        });
-        console.log(`[ViamService] ✅ Connected via dev API key to ${host}`);
-        this.clients.set(machineId, client);
-        return client;
+        // Dynamically import credentials ONLY in a dev environment
+        const { DEV_VIAM_CREDENTIALS } = await import('../config/dev-credentials');
+
+        if (DEV_VIAM_CREDENTIALS && DEV_VIAM_CREDENTIALS.apiKeyId) {
+          const client = await VIAM.createRobotClient({
+            host,
+            credentials: {
+              type: 'api-key',
+              payload: DEV_VIAM_CREDENTIALS.apiKey,
+              authEntity: DEV_VIAM_CREDENTIALS.apiKeyId,
+            },
+            signalingAddress: 'https://app.viam.com:443',
+          });
+          console.log(`[ViamService] ✅ Connected via dev API key to ${host}`);
+          this.clients.set(machineId, client);
+          return client;
+        }
       } catch (error) {
-        console.error(`[ViamService] ❌ Dev API key connection failed for ${host}:`, error);
+        // This will gracefully fail in production (where the file doesn't exist)
+        // or if the connection fails in dev.
+        console.error(`[ViamService] ❌ Dev credentials not used or failed:`, error);
       }
     }
 
