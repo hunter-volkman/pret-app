@@ -57,6 +57,7 @@ const icons = {
 const AutoFitBounds = ({ bounds }: { bounds: L.LatLngBounds }) => {
   const map = useMap();
   useEffect(() => {
+    map.invalidateSize();
     if (bounds.isValid()) {
       map.fitBounds(bounds, { padding: [50, 50] });
     }
@@ -66,7 +67,7 @@ const AutoFitBounds = ({ bounds }: { bounds: L.LatLngBounds }) => {
 
 // The main MapView component
 export function MapView() {
-  const { stores, alerts, setCurrentStore, setAlertFilter } = useStore();
+  const { stores, alerts, setCurrentStore, setAlertFilter, setCurrentView } = useStore();
   const alertStoreIds = new Set(alerts.filter(a => !a.read).map(a => a.storeId));
 
   const getStoreMarkerStatus = (store: StoreData) => {
@@ -77,6 +78,7 @@ export function MapView() {
 
   const handleViewCamera = (store: StoreData) => {
     setCurrentStore(store);
+    setCurrentView('camera');
   };
 
   const handleViewAlerts = (storeId: string) => {
@@ -92,8 +94,12 @@ export function MapView() {
   return (
     <>
       <style>{pulsingIconStyle}</style>
-      <div className="p-0 md:p-6 h-[calc(100vh-148px)] md:h-[calc(100vh-160px)] relative">
-        <div className="h-full w-full rounded-lg overflow-hidden shadow-md">
+      {/* This is the definitive fix. We are setting the container height to be the dynamic viewport height (dvh)
+        minus the known heights of the header (pt-20 = 5rem) and the nav bar (pb-24 = 6rem).
+        This makes the map container perfectly fill the available space without causing overflow.
+      */}
+      <div className="h-[calc(100dvh-11rem)]">
+        <div className="h-full w-full">
           <MapContainer
             center={[39.8283, -98.5795]} // Centered on US
             zoom={4}
@@ -117,14 +123,14 @@ export function MapView() {
                       <h4 className="font-bold text-base text-gray-800">{store.name}</h4>
                       <p className="text-xs text-gray-600 -mt-1">{store.address}</p>
                       <div className="flex space-x-2 pt-2">
-                        <button 
+                        <button
                           onClick={() => handleViewCamera(store)}
                           className="w-full bg-blue-600 text-white text-sm font-semibold py-2 px-3 rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-2"
                         >
                           <Camera className="w-4 h-4" />
                           <span>Camera</span>
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleViewAlerts(store.id)}
                           className="w-full bg-gray-200 text-gray-800 text-sm font-semibold py-2 px-3 rounded-lg hover:bg-gray-300 flex items-center justify-center space-x-2"
                         >
