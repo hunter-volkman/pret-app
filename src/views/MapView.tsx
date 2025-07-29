@@ -57,10 +57,14 @@ const icons = {
 const AutoFitBounds = ({ bounds }: { bounds: L.LatLngBounds }) => {
   const map = useMap();
   useEffect(() => {
-    map.invalidateSize();
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [50, 50] });
-    }
+    // A slight delay ensures the map container has resized before fitting bounds
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [50, 50] });
+      }
+    }, 100);
+    return () => clearTimeout(timer);
   }, [map, bounds]);
   return null;
 };
@@ -83,10 +87,11 @@ export function MapView() {
 
   const handleViewAlerts = (storeId: string) => {
     setAlertFilter(storeId);
+    setCurrentView('alerts'); // Also switch to alerts view
   };
 
   const bounds = useMemo(() => {
-    if (stores.length === 0) return L.latLngBounds([40.7, -74], [34, -118]);
+    if (stores.length === 0) return L.latLngBounds([40.7, -74], [34, -118]); // Default view
     const latLngs = stores.map(s => [s.coords.lat, s.coords.lng] as L.LatLngTuple);
     return L.latLngBounds(latLngs);
   }, [stores]);
@@ -94,58 +99,52 @@ export function MapView() {
   return (
     <>
       <style>{pulsingIconStyle}</style>
-      {/* This is the definitive fix. We are setting the container height to be the dynamic viewport height (dvh)
-        minus the known heights of the header (pt-20 = 5rem) and the nav bar (pb-24 = 6rem).
-        This makes the map container perfectly fill the available space without causing overflow.
-      */}
-      <div className="h-[calc(100dvh-11rem)]">
-        <div className="h-full w-full">
-          <MapContainer
-            center={[39.8283, -98.5795]} // Centered on US
-            zoom={4}
-            style={{ height: '100%', width: '100%' }}
-            scrollWheelZoom={true}
-          >
-            <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-            />
-            {stores.map(store => {
-              const status = getStoreMarkerStatus(store);
-              return (
-                <Marker
-                  key={store.id}
-                  position={[store.coords.lat, store.coords.lng]}
-                  icon={icons[status]}
-                >
-                  <Popup>
-                    <div className="p-1 space-y-2 w-[220px]">
-                      <h4 className="font-bold text-base text-gray-800">{store.name}</h4>
-                      <p className="text-xs text-gray-600 -mt-1">{store.address}</p>
-                      <div className="flex space-x-2 pt-2">
-                        <button
-                          onClick={() => handleViewCamera(store)}
-                          className="w-full bg-blue-600 text-white text-sm font-semibold py-2 px-3 rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-2"
-                        >
-                          <Camera className="w-4 h-4" />
-                          <span>Camera</span>
-                        </button>
-                        <button
-                          onClick={() => handleViewAlerts(store.id)}
-                          className="w-full bg-gray-200 text-gray-800 text-sm font-semibold py-2 px-3 rounded-lg hover:bg-gray-300 flex items-center justify-center space-x-2"
-                        >
-                          <AlertTriangle className="w-4 h-4" />
-                          <span>Alerts</span>
-                        </button>
-                      </div>
+      <div className="h-full w-full">
+        <MapContainer
+          center={[39.8283, -98.5795]} // Centered on US
+          zoom={4}
+          style={{ height: '100%', width: '100%' }}
+          scrollWheelZoom={true}
+        >
+          <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          />
+          {stores.map(store => {
+            const status = getStoreMarkerStatus(store);
+            return (
+              <Marker
+                key={store.id}
+                position={[store.coords.lat, store.coords.lng]}
+                icon={icons[status]}
+              >
+                <Popup>
+                  <div className="p-1 space-y-2 w-[220px]">
+                    <h4 className="font-bold text-base text-gray-800">{store.name}</h4>
+                    <p className="text-xs text-gray-600 -mt-1">{store.address}</p>
+                    <div className="flex space-x-2 pt-2">
+                      <button
+                        onClick={() => handleViewCamera(store)}
+                        className="w-full bg-blue-600 text-white text-sm font-semibold py-2 px-3 rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-2"
+                      >
+                        <Camera className="w-4 h-4" />
+                        <span>Camera</span>
+                      </button>
+                      <button
+                        onClick={() => handleViewAlerts(store.id)}
+                        className="w-full bg-gray-200 text-gray-800 text-sm font-semibold py-2 px-3 rounded-lg hover:bg-gray-300 flex items-center justify-center space-x-2"
+                      >
+                        <AlertTriangle className="w-4 h-4" />
+                        <span>Alerts</span>
+                      </button>
                     </div>
-                  </Popup>
-                </Marker>
-              );
-            })}
-            <AutoFitBounds bounds={bounds} />
-          </MapContainer>
-        </div>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+          <AutoFitBounds bounds={bounds} />
+        </MapContainer>
       </div>
     </>
   );
