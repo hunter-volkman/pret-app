@@ -97,10 +97,10 @@ function MainAppContent() {
   };
 
   return (
-    <div className="h-dvh flex flex-col bg-gray-50">
+    <div className="bg-gray-50">
       <Header userInfo={userInfo} onLogout={handleLogout} />
       
-      <main className="flex-1 overflow-y-auto">
+      <main className="h-dvh overflow-y-auto pt-20 pb-24">
         {currentView === 'stores' && <StoresView />}
         {currentView === 'map' && <MapView />}
         {currentView === 'alerts' && <AlertsView />}
