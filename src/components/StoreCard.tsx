@@ -82,13 +82,25 @@ export function StoreCard({ store, isSelected, onToggle, onClick }: StoreCardPro
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gray-50/70 rounded-lg p-3">
-            <div className="flex items-center text-gray-500 text-sm mb-1"><Activity className="w-4 h-4 mr-2"/> Stock Level</div>
-            <p className="text-3xl font-bold text-gray-800">{avgFill}<span className="text-xl">%</span></p>
+          <div className={`rounded-lg p-3 transition-colors duration-300 ${isSelected && store.status === 'online' ? 'bg-gray-50/70' : 'bg-gray-100'}`}>
+            <div className={`flex items-center text-sm mb-1 transition-colors duration-300 ${isSelected && store.status === 'online' ? 'text-gray-500' : 'text-gray-400'}`}>
+              <Activity className="w-4 h-4 mr-2"/> Stock Level
+            </div>
+            {isSelected && store.status === 'online' ? (
+              <p className="text-3xl font-bold text-gray-800">{avgFill}<span className="text-xl">%</span></p>
+            ) : (
+              <p className="text-3xl font-bold text-gray-400">—<span className="text-xl">%</span></p>
+            )}
           </div>
-          <div className="bg-gray-50/70 rounded-lg p-3">
-            <div className="flex items-center text-gray-500 text-sm mb-1"><Thermometer className="w-4 h-4 mr-2"/> Temperature</div>
-            <p className="text-3xl font-bold text-gray-800">{avgTemp.toFixed(1)}<span className="text-xl">°C</span></p>
+          <div className={`rounded-lg p-3 transition-colors duration-300 ${isSelected && store.status === 'online' ? 'bg-gray-50/70' : 'bg-gray-100'}`}>
+            <div className={`flex items-center text-sm mb-1 transition-colors duration-300 ${isSelected && store.status === 'online' ? 'text-gray-500' : 'text-gray-400'}`}>
+              <Thermometer className="w-4 h-4 mr-2"/> Temperature
+            </div>
+            {isSelected && store.status === 'online' ? (
+              <p className="text-3xl font-bold text-gray-800">{avgTemp.toFixed(1)}<span className="text-xl">°C</span></p>
+            ) : (
+              <p className="text-3xl font-bold text-gray-400">—<span className="text-xl">°C</span></p>
+            )}
           </div>
         </div>
       </div>
