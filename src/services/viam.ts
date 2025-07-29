@@ -61,14 +61,17 @@ class ViamService {
         this.clients.set(machineId, client);
         return client;
       }
-    } catch (error) {
-      console.error(`[ViamService] ❌ OAuth connection failed for ${host}:`, error);
+    } catch (error: any) {
+      if (error?.message?.includes('timed out')) {
+        console.log(`[ViamService] ⚪️ Connection timed out for ${host}. Machine is likely offline.`);
+      } else {
+        console.error(`[ViamService] ❌ OAuth connection failed for ${host}:`, error);
+      }
     }
 
     // Priority 2: Fallback to dev credentials in development
     if (import.meta.env.DEV) {
       try {
-        // Dynamically import credentials ONLY in a dev environment
         const { DEV_VIAM_CREDENTIALS } = await import('../config/dev-credentials');
 
         if (DEV_VIAM_CREDENTIALS && DEV_VIAM_CREDENTIALS.apiKeyId) {
@@ -90,15 +93,14 @@ class ViamService {
       }
     }
 
-    console.error(`[ViamService] ❌ No valid authentication method available for ${host}.`);
+    // If all connection methods fail, log this once.
+    console.error(`[ViamService] ❌ No valid authentication method succeeded for ${host}.`);
     return null;
   }
 
   async checkMachineStatus(machineId: string): Promise<'online' | 'offline'> {
     const client = await this.connect(machineId);
     if (client) {
-      // The connection succeeded, so it's online.
-      // Immediately disconnect to free up the connection resource.
       this.disconnect(machineId);
       return 'online';
     }
@@ -109,6 +111,14 @@ class ViamService {
     const client = await this.connect(machineId);
     if (!client) return [];
     try {
+      const resources = await client.resourceNames();
+      const hasStockSensor = resources.some(r => r.name === 'langer_fill');
+      
+      if (!hasStockSensor) {
+        console.log(`[ViamService] ℹ️ No 'langer_fill' sensor found on ${machineId}. Skipping stock readings.`);
+        return [];
+      }
+
       const sensor = new VIAM.SensorClient(client, 'langer_fill');
       const readings = await sensor.getReadings();
       return Object.entries(readings)
@@ -123,7 +133,7 @@ class ViamService {
           }
         });
     } catch (error) {
-      console.error(`Stock readings failed for ${machineId}:`, error);
+      console.error(`[ViamService] ❌ Stock readings failed for ${machineId}:`, error);
       return [];
     }
   }
@@ -132,6 +142,14 @@ class ViamService {
     const client = await this.connect(machineId);
     if (!client) return [];
     try {
+      const resources = await client.resourceNames();
+      const hasTempSensor = resources.some(r => r.name === 'gateway');
+
+      if (!hasTempSensor) {
+        console.log(`[ViamService] ℹ️ No 'gateway' sensor found on ${machineId}. Skipping temperature readings.`);
+        return [];
+      }
+
       const sensor = new VIAM.SensorClient(client, 'gateway');
       const readings = await sensor.getReadings();
       return Object.entries(readings).map(([id, data]: [string, any]) => ({
@@ -143,7 +161,7 @@ class ViamService {
         status: this.getTempStatus(data.TempC_SHT || data.TempC_DS || 0, id),
       }));
     } catch (error) {
-      console.error(`Temperature readings failed for ${machineId}:`, error);
+      console.error(`[ViamService] ❌ Temperature readings failed for ${machineId}:`, error);
       return [];
     }
   }
@@ -152,12 +170,20 @@ class ViamService {
     const client = await this.connect(machineId);
     if (!client) return null;
     try {
+      const resources = await client.resourceNames();
       const cameraName = overlay ? 'langer_fill_view' : 'camera';
+      const hasCamera = resources.some(r => r.name === cameraName);
+
+      if (!hasCamera) {
+        console.log(`[ViamService] ℹ️ No '${cameraName}' camera found on ${machineId}.`);
+        return null;
+      }
+      
       const camera = new VIAM.CameraClient(client, cameraName);
       const image = await camera.getImage();
       return URL.createObjectURL(new Blob([image], { type: 'image/jpeg' }));
     } catch (error) {
-      console.error(`Camera failed for ${machineId}:`, error);
+      console.error(`[ViamService] ❌ Camera failed for ${machineId}:`, error);
       return null;
     }
   }
