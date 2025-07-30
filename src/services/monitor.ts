@@ -4,7 +4,7 @@ import { STORES } from '../config/stores'
 import { Store } from '../config/stores'
 
 class MonitorService {
-  private intervals = new Map<string, NodeJS.Timeout>()
+  private intervals = new Map<string, NodeJS.Timeout>()
 
   public start(selectedStores: Set<string>): void {
     this.stop()
@@ -28,9 +28,22 @@ class MonitorService {
 
   private async pollStore(store: Store): Promise<void> {
     try {
+      // Proactively check the store's status from our reliable health checker.
+      // If it's offline, don't even attempt to poll for data.
+      const currentStore = useStore.getState().stores.find(s => s.id === store.id);
+      if (currentStore?.status === 'offline') {
+        // This is a normal condition, so we can comment out the log to keep the console clean.
+        // console.log(`[Monitor] Skipping poll for offline store: ${store.name}`);
+        return;
+      }
       await this.updateWithRealData(store);
-    } catch (error) {
-      console.error(`Polling failed for ${store.name}:`, error)
+    } catch (error: any) {
+      // This catch block is now a secondary fallback for unexpected polling errors.
+      if (error?.message?.includes('timed out')) {
+        console.log(`[Monitor] ⚪️ Polling timed out for ${store.name}, machine may be offline.`);
+      } else {
+        console.error(`[Monitor] ❌ Polling failed for ${store.name}:`, error)
+      }
       useStore.getState().updateStore(store.id, { status: 'offline' })
     }
   }
@@ -41,8 +54,9 @@ class MonitorService {
       viam.getTemperatureReadings(store.tempMachineId)
     ]);
     
+    // The health checker is the sole source of truth for online/offline status.
+    // This function is now only responsible for updating data readings.
     useStore.getState().updateStore(store.id, {
-      status: 'online',
       stockRegions,
       tempSensors
     });
