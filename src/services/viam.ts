@@ -7,9 +7,11 @@ import { auth } from './auth';
  * It handles connecting to robots, fetching stock and temperature readings,
  * and managing camera streams.
  */
-
 class ViamService {
+  // Cache for active, resolved robot clients.
   private clients = new Map<string, VIAM.RobotClient>();
+  // Cache for in-flight connection promises to prevent race conditions.
+  private connectingPromises = new Map<string, Promise<VIAM.RobotClient | null>>();
 
   private getMachineAddress(machineId: string): string | null {
     const addressMap: Record<string, string> = {
@@ -29,82 +31,74 @@ class ViamService {
     return addressMap[machineId] || null;
   }
 
+  // This is now the primary method for getting a client. It creates and caches connections.
   async connect(machineId: string): Promise<VIAM.RobotClient | null> {
-    if (!machineId) {
-      console.error("[ViamService] Connect called with undefined machineId.");
-      return null;
-    }
-    
+    // Return cached client if it exists
     if (this.clients.has(machineId)) {
       return this.clients.get(machineId)!;
     }
 
+    // If a connection is already in progress, wait for it to complete
+    if (this.connectingPromises.has(machineId)) {
+      return this.connectingPromises.get(machineId)!;
+    }
+
     const host = this.getMachineAddress(machineId);
     if (!host) {
-      console.error(`[ViamService] ❌ Could not find address for machine ID: ${machineId}`);
+      console.error(`[ViamService] ❌ No address for machine ID: ${machineId}`);
       return null;
     }
 
-    // Priority 1: Try OAuth token
-    try {
-      const accessToken = await auth.getAccessToken();
-      if (accessToken && accessToken !== 'mock-token') {
+    // Create a new connection promise and store it
+    const connectPromise = (async () => {
+      try {
+        const accessToken = await auth.getAccessToken();
+        if (!accessToken || accessToken === 'mock-token') {
+          return null;
+        }
+
         const client = await VIAM.createRobotClient({
           host,
-          credentials: {
-            type: 'access-token',
-            payload: accessToken,
-          },
+          credentials: { type: 'access-token', payload: accessToken },
           signalingAddress: 'https://app.viam.com:443',
         });
-        console.log(`[ViamService] ✅ Connected via OAuth token to ${host}`);
+
+        console.log(`[ViamService] ✅ New connection established to ${host}`);
         this.clients.set(machineId, client);
         return client;
-      }
-    } catch (error: any) {
-      if (error?.message?.includes('timed out')) {
-        console.log(`[ViamService] ⚪️ Connection timed out for ${host}. Machine is likely offline.`);
-      } else {
-        console.error(`[ViamService] ❌ OAuth connection failed for ${host}:`, error);
-      }
-    }
-
-    // Priority 2: Fallback to dev credentials in development
-    if (import.meta.env.DEV) {
-      try {
-        const { DEV_VIAM_CREDENTIALS } = await import('../config/dev-credentials');
-
-        if (DEV_VIAM_CREDENTIALS && DEV_VIAM_CREDENTIALS.apiKeyId) {
-          const client = await VIAM.createRobotClient({
-            host,
-            credentials: {
-              type: 'api-key',
-              payload: DEV_VIAM_CREDENTIALS.apiKey,
-              authEntity: DEV_VIAM_CREDENTIALS.apiKeyId,
-            },
-            signalingAddress: 'https://app.viam.com:443',
-          });
-          console.log(`[ViamService] ✅ Connected via dev API key to ${host}`);
-          this.clients.set(machineId, client);
-          return client;
-        }
       } catch (error) {
-        console.error(`[ViamService] ❌ Dev credentials not used or failed:`, error);
+        // Expected for offline machines, so we don't log an error.
+        return null;
+      } finally {
+        // Once the connection attempt is complete, remove the promise from the cache.
+        this.connectingPromises.delete(machineId);
       }
-    }
+    })();
 
-    // If all connection methods fail, log this once.
-    console.error(`[ViamService] ❌ No valid authentication method succeeded for ${host}.`);
-    return null;
+    this.connectingPromises.set(machineId, connectPromise);
+    return connectPromise;
   }
 
-  async checkMachineStatus(machineId: string): Promise<'online' | 'offline'> {
+  /**
+   * Performs a lightweight check to see if a machine is responsive.
+   * It uses the main connection cache and will self-heal by removing stale connections.
+   */
+  async pingMachine(machineId: string): Promise<'online' | 'offline'> {
     const client = await this.connect(machineId);
-    if (client) {
-      this.disconnect(machineId);
-      return 'online';
+    if (!client) {
+      return 'offline';
     }
-    return 'offline';
+    try {
+      // A very lightweight operation to confirm the connection is active.
+      await client.resourceNames();
+      return 'online';
+    } catch (error) {
+      // If the ping fails, the connection is stale.
+      const host = this.getMachineAddress(machineId);
+      console.log(`[ViamService] ⚪️ Ping failed for ${host}. Cleaning up stale connection.`);
+      this.disconnect(machineId); // Self-heal by removing the dead client.
+      return 'offline';
+    }
   }
 
   async getStockReadings(machineId: string): Promise<StockRegion[]> {
@@ -115,7 +109,6 @@ class ViamService {
       const hasStockSensor = resources.some(r => r.name === 'langer_fill');
       
       if (!hasStockSensor) {
-        console.log(`[ViamService] ℹ️ No 'langer_fill' sensor found on ${machineId}. Skipping stock readings.`);
         return [];
       }
 
@@ -134,6 +127,7 @@ class ViamService {
         });
     } catch (error) {
       console.error(`[ViamService] ❌ Stock readings failed for ${machineId}:`, error);
+      this.disconnect(machineId); // Disconnect on error to force a fresh connection next time.
       return [];
     }
   }
@@ -146,7 +140,6 @@ class ViamService {
       const hasTempSensor = resources.some(r => r.name === 'gateway');
 
       if (!hasTempSensor) {
-        console.log(`[ViamService] ℹ️ No 'gateway' sensor found on ${machineId}. Skipping temperature readings.`);
         return [];
       }
 
@@ -162,6 +155,7 @@ class ViamService {
       }));
     } catch (error) {
       console.error(`[ViamService] ❌ Temperature readings failed for ${machineId}:`, error);
+      this.disconnect(machineId); // Disconnect on error to force a fresh connection next time.
       return [];
     }
   }
@@ -175,7 +169,6 @@ class ViamService {
       const hasCamera = resources.some(r => r.name === cameraName);
 
       if (!hasCamera) {
-        console.log(`[ViamService] ℹ️ No '${cameraName}' camera found on ${machineId}.`);
         return null;
       }
       
@@ -184,6 +177,7 @@ class ViamService {
       return URL.createObjectURL(new Blob([image], { type: 'image/jpeg' }));
     } catch (error) {
       console.error(`[ViamService] ❌ Camera failed for ${machineId}:`, error);
+      this.disconnect(machineId); // Disconnect on error to force a fresh connection next time.
       return null;
     }
   }
@@ -211,8 +205,10 @@ class ViamService {
   disconnect(machineId: string) {
     const client = this.clients.get(machineId);
     if (client) {
+      const host = this.getMachineAddress(machineId);
       client.disconnect();
       this.clients.delete(machineId);
+      console.log(`[ViamService] Disconnected from ${host}`);
     }
   }
 }
