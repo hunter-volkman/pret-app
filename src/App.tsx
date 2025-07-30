@@ -28,11 +28,10 @@ function LoginScreen() {
 
   return (
     <div className="flex flex-col min-h-dvh bg-gray-50 text-gray-800 p-8 justify-between">
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col items-center justify-center text-center">
         <img src="/login.png" alt="Pret A Manger Logo" className="w-56 sm:w-64 mb-6" />
         <p className="text-gray-500 text-lg mb-10">
-          Real-time Fleet Operations Dashboard
+          Real-time QSR Operations
         </p>
 
         <button
@@ -51,7 +50,6 @@ function LoginScreen() {
         </button>
       </div>
 
-      {/* Footer */}
       <div className="text-center text-gray-500 text-xs flex-shrink-0">
         <img src="/powered-by-viam.png" alt="Powered by Viam" className="h-4 w-auto mx-auto mb-2 opacity-50" />
         <p>By using this app, you agree to our Privacy Policy.</p>
@@ -79,10 +77,8 @@ function MainAppContent() {
     const healthCheck = async () => {
       console.log('🩺 [HealthCheck] Running global status check...');
       for (const store of STORES) {
-        // A store is online if its primary machine is reachable. We'll use stockMachineId.
-        const status = await viam.checkMachineStatus(store.stockMachineId);
+        const status = await viam.pingMachine(store.stockMachineId);
         
-        // Only update if the status has changed to prevent unnecessary re-renders
         const currentStore = useStore.getState().stores.find(s => s.id === store.id);
         if (currentStore && currentStore.status !== status) {
           updateStore(store.id, { status });
@@ -90,8 +86,8 @@ function MainAppContent() {
       }
     };
 
-    healthCheck(); // Run immediately on mount
-    const intervalId = setInterval(healthCheck, 60000); // Run every 60 seconds
+    healthCheck();
+    const intervalId = setInterval(healthCheck, 60000);
 
     return () => clearInterval(intervalId);
   }, [updateStore]);
@@ -149,10 +145,7 @@ function App() {
       });
     };
 
-    // Listen for our custom auth event
     window.addEventListener('authChange', handleAuthChange);
-
-    // Initial check
     handleAuthChange();
 
     return () => window.removeEventListener('authChange', handleAuthChange);
