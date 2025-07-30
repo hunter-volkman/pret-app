@@ -1,7 +1,7 @@
 {
   "name": "Pret Monitor",
   "short_name": "Pret Monitor",
-  "description": "Real-time store monitoring for Pret A Manger",
+  "description": "Real-time monitoring for Pret A Manger",
   "start_url": "/",
   "display": "standalone",
   "theme_color": "#FFFFFF",
