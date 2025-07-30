@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { ChevronDown, MapPin, Thermometer, Activity, Wifi, WifiOff, AlertCircle, Bell, BellOff } from 'lucide-react';
-import { useStore, StoreData } from '../stores/store';
+import { ChevronDown, MapPin, Thermometer, Box, Wifi, WifiOff, AlertCircle, Bell, BellOff, AlertTriangle, Loader2 } from 'lucide-react';
+import { useStore, StoreData, TempSensor } from '../stores/store';
 
+// Helper for stock region grid colors
 const getFillColor = (status: 'ok' | 'low' | 'empty') => {
   switch (status) {
     case 'ok': return 'bg-green-100 text-green-800';
@@ -11,9 +12,18 @@ const getFillColor = (status: 'ok' | 'low' | 'empty') => {
   }
 };
 
+// Helpers for sensor status colors
 const getTempColor = (status: 'normal' | 'warning' | 'critical') => {
   switch (status) {
-    case 'normal': return 'text-green-600';
+    case 'normal': return 'bg-green-500';
+    case 'warning': return 'bg-yellow-500';
+    case 'critical': return 'bg-red-500';
+    default: return 'bg-gray-500';
+  }
+};
+const getTempTextColor = (status: 'normal' | 'warning' | 'critical') => {
+  switch (status) {
+    case 'normal': return 'text-gray-800';
     case 'warning': return 'text-yellow-600';
     case 'critical': return 'text-red-600';
     default: return 'text-gray-600';
@@ -24,10 +34,11 @@ interface StoreCardProps {
   store: StoreData;
   isSelected: boolean;
   onToggle: () => void;
-  onClick: () => void;
+  onHeaderClick: () => void;
+  onSensorClick: (sensor: TempSensor) => void;
 }
 
-export function StoreCard({ store, isSelected, onToggle, onClick }: StoreCardProps) {
+export function StoreCard({ store, isSelected, onToggle, onHeaderClick, onSensorClick }: StoreCardProps) {
   const [expanded, setExpanded] = useState(false);
   const { alerts, notificationSubscriptions, toggleNotificationSubscription } = useStore();
   
@@ -44,19 +55,34 @@ export function StoreCard({ store, isSelected, onToggle, onClick }: StoreCardPro
     return colA.localeCompare(colB);
   });
   
-  const avgFill = stockRegions.length > 0 ? Math.round(stockRegions.reduce((sum, r) => sum + r.fillLevel, 0) / stockRegions.length) : 0;
-  const avgTemp = tempSensors.length > 0 ? (tempSensors.reduce((sum, s) => sum + s.temperature, 0) / tempSensors.length) : 0;
-  
+  const activeIssuesCount = tempSensors.filter(s => s.status !== 'normal').length +
+                          stockRegions.filter(r => r.status !== 'ok').length;
+
+  // ✨ Helper to get status display properties
+  const getStatusDisplay = () => {
+    switch(store.status) {
+      case 'online':
+        return { text: 'Online', icon: <Wifi className="w-3 h-3" />, className: 'bg-green-100 text-green-700' };
+      case 'connecting':
+        return { text: 'Connecting', icon: <Loader2 className="w-3 h-3 animate-spin" />, className: 'bg-yellow-100 text-yellow-700' };
+      case 'offline':
+      default:
+        return { text: 'Offline', icon: <WifiOff className="w-3 h-3" />, className: 'bg-red-100 text-red-700' };
+    }
+  }
+  const statusDisplay = getStatusDisplay();
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300">
       <div className="p-5">
-        <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start justify-between">
           <div className="flex-1 pr-4">
-            <div className="flex items-center space-x-2 mb-1 cursor-pointer" onClick={onClick}>
+            <div className="flex items-center space-x-2 mb-1 cursor-pointer" onClick={onHeaderClick}>
               <h3 className="text-lg font-bold text-gray-800 hover:text-blue-600">{store.name}</h3>
-              <div className={`flex items-center space-x-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${store.status === 'online' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                {store.status === 'online' ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-                <span>{store.status}</span>
+              {/* ✨ Use the status display helper */}
+              <div className={`flex items-center space-x-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${statusDisplay.className}`}>
+                {statusDisplay.icon}
+                <span>{statusDisplay.text}</span>
               </div>
             </div>
             <p className="text-sm text-gray-500 flex items-center"><MapPin className="w-4 h-4 mr-1.5 flex-shrink-0" />{store.address}</p>
@@ -66,10 +92,7 @@ export function StoreCard({ store, isSelected, onToggle, onClick }: StoreCardPro
           </div>
           <div className="flex items-center space-x-2">
             <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleNotificationSubscription(store.id);
-              }}
+              onClick={(e) => { e.stopPropagation(); toggleNotificationSubscription(store.id); }}
               className={`p-2 rounded-lg transition-colors ${isSubscribed ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
               aria-label={isSubscribed ? 'Unsubscribe from notifications' : 'Subscribe to notifications'}
             >
@@ -81,40 +104,48 @@ export function StoreCard({ store, isSelected, onToggle, onClick }: StoreCardPro
             </label>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className={`rounded-lg p-3 transition-colors duration-300 ${isSelected && store.status === 'online' ? 'bg-gray-50/70' : 'bg-gray-100'}`}>
-            <div className={`flex items-center text-sm mb-1 transition-colors duration-300 ${isSelected && store.status === 'online' ? 'text-gray-500' : 'text-gray-400'}`}>
-              <Activity className="w-4 h-4 mr-2"/> Stock Level
+
+        <div className={`mt-4 border rounded-lg p-3 flex items-center justify-between transition-colors duration-300 ${isSelected ? 'bg-gray-50/80 border-gray-200' : 'bg-gray-100 border-transparent'}`}>
+          {!isSelected ? (
+            <p className="text-center text-sm text-gray-400 w-full">Enable monitoring to see live status</p>
+          ) : store.status === 'connecting' ? (
+            <div className="flex items-center justify-center w-full text-sm text-gray-500">
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Establishing connection...
             </div>
-            {isSelected && store.status === 'online' ? (
-              <p className="text-3xl font-bold text-gray-800">{avgFill}<span className="text-xl">%</span></p>
-            ) : (
-              <p className="text-3xl font-bold text-gray-400">—<span className="text-xl">%</span></p>
+          ) : (
+            <>
+              <div className="flex items-center space-x-4 text-sm text-gray-600">
+                <div className="flex items-center space-x-1.5">
+                  <Box className="w-4 h-4" />
+                  <span>{stockRegions.length} <span className="hidden sm:inline">Regions</span></span>
+                </div>
+                <div className="flex items-center space-x-1.5">
+                  <Thermometer className="w-4 h-4" />
+                  <span>{tempSensors.length} <span className="hidden sm:inline">Sensors</span></span>
+                </div>
+              </div>
+              {store.status === 'online' && (
+              <div className={`flex items-center space-x-1.5 text-sm font-semibold px-3 py-1 rounded-full ${activeIssuesCount > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                {activeIssuesCount > 0 ? <AlertTriangle className="w-4 h-4" /> : '✅'}
+                <span>{activeIssuesCount} Issue{activeIssuesCount !== 1 && 's'}</span>
+              </div>
             )}
-          </div>
-          <div className={`rounded-lg p-3 transition-colors duration-300 ${isSelected && store.status === 'online' ? 'bg-gray-50/70' : 'bg-gray-100'}`}>
-            <div className={`flex items-center text-sm mb-1 transition-colors duration-300 ${isSelected && store.status === 'online' ? 'text-gray-500' : 'text-gray-400'}`}>
-              <Thermometer className="w-4 h-4 mr-2"/> Temperature
-            </div>
-            {isSelected && store.status === 'online' ? (
-              <p className="text-3xl font-bold text-gray-800">{avgTemp.toFixed(1)}<span className="text-xl">°C</span></p>
-            ) : (
-              <p className="text-3xl font-bold text-gray-400">—<span className="text-xl">°C</span></p>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </div>
       
-      {isSelected && (
+      {isSelected && store.status === 'online' && (
         <div className="border-t border-gray-200">
           <button onClick={() => setExpanded(!expanded)} className="w-full px-5 py-3 flex items-center justify-between text-sm text-gray-600 hover:bg-gray-50 transition-colors">
-            <span className="font-medium">View Details ({stockRegions.length} regions, {tempSensors.length} sensors)</span>
+            <span className="font-medium">View Details</span>
             <ChevronDown className={`w-5 h-5 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} />
           </button>
           
           {expanded && (
             <div className="px-5 pb-5 bg-gray-50 border-t border-gray-200 animate-in fade-in-0 duration-300">
-              {sortedStockRegions.length > 0 && (
+              {stockRegions.length > 0 && (
                 <div className="pt-4">
                   <h4 className="text-sm font-semibold text-gray-800 mb-3">Stock Regions</h4>
                   <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
@@ -132,13 +163,17 @@ export function StoreCard({ store, isSelected, onToggle, onClick }: StoreCardPro
                   <h4 className="text-sm font-semibold text-gray-800 mb-3">Temperature Sensors</h4>
                   <div className="space-y-2">
                     {tempSensors.map((sensor) => (
-                      <div key={sensor.id} className="flex items-center justify-between text-sm p-3 bg-white rounded-lg border border-gray-200">
-                        <span className="text-gray-700 font-medium">{sensor.name}</span>
+                      <button
+                        key={sensor.id}
+                        onClick={() => onSensorClick(sensor)}
+                        className="w-full flex items-center justify-between text-sm p-3 bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:border-blue-400 transition-colors text-left"
+                      >
+                        <span className="font-medium text-gray-700">{sensor.name}</span>
                         <div className="flex items-center space-x-2">
-                          <span className={`font-bold ${getTempColor(sensor.status)}`}>{sensor.temperature.toFixed(1)}°C</span>
-                          <div className={`w-2.5 h-2.5 rounded-full ${getTempColor(sensor.status).replace('text', 'bg')}`} />
+                          <span className={`font-bold ${getTempTextColor(sensor.status)}`}>{sensor.temperature.toFixed(1)}°C</span>
+                          <div className={`w-2.5 h-2.5 rounded-full ${getTempColor(sensor.status)}`} />
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>
