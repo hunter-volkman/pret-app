@@ -1,8 +1,8 @@
 {
-  "module_id": "pret:app",
+  "module_id": "pret:monitor",
   "visibility": "public",
   "url": "https://github.com/hunter-volkman/pret-app",
-  "description": "Real-time inventory and temperature monitoring for Pret A Manger stores",
+  "description": "Real-time monitoring for Pret A Manger stores",
   "applications": [
     {
       "name": "app",
