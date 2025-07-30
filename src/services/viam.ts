@@ -2,6 +2,12 @@ import * as VIAM from '@viamrobotics/sdk';
 import { StockRegion, TempSensor } from '../stores/store';
 import { auth } from './auth';
 
+// The data structure for a single point in our temperature chart
+export interface TemperatureDataPoint {
+  x: Date;
+  y: number;
+}
+
 /**
  * ViamService provides methods to interact with Viam's robotics platform.
  * It handles connecting to robots, fetching stock and temperature readings,
@@ -31,14 +37,11 @@ class ViamService {
     return addressMap[machineId] || null;
   }
 
-  // This is now the primary method for getting a client. It creates and caches connections.
   async connect(machineId: string): Promise<VIAM.RobotClient | null> {
-    // Return cached client if it exists
     if (this.clients.has(machineId)) {
       return this.clients.get(machineId)!;
     }
 
-    // If a connection is already in progress, wait for it to complete
     if (this.connectingPromises.has(machineId)) {
       return this.connectingPromises.get(machineId)!;
     }
@@ -49,7 +52,6 @@ class ViamService {
       return null;
     }
 
-    // Create a new connection promise and store it
     const connectPromise = (async () => {
       try {
         const accessToken = await auth.getAccessToken();
@@ -66,11 +68,14 @@ class ViamService {
         console.log(`[ViamService] ✅ New connection established to ${host}`);
         this.clients.set(machineId, client);
         return client;
-      } catch (error) {
-        // Expected for offline machines, so we don't log an error.
+      } catch (error: any) {
+        if (error?.message?.includes('timed out')) {
+          console.log(`[ViamService] ⚪️ Connection timed out for ${host}. Machine is likely offline.`);
+        } else {
+          console.error(`[ViamService] ❌ Unexpected error connecting to ${host}:`, error);
+        }
         return null;
       } finally {
-        // Once the connection attempt is complete, remove the promise from the cache.
         this.connectingPromises.delete(machineId);
       }
     })();
@@ -78,25 +83,19 @@ class ViamService {
     this.connectingPromises.set(machineId, connectPromise);
     return connectPromise;
   }
-
-  /**
-   * Performs a lightweight check to see if a machine is responsive.
-   * It uses the main connection cache and will self-heal by removing stale connections.
-   */
+  
   async pingMachine(machineId: string): Promise<'online' | 'offline'> {
     const client = await this.connect(machineId);
     if (!client) {
       return 'offline';
     }
     try {
-      // A very lightweight operation to confirm the connection is active.
       await client.resourceNames();
       return 'online';
     } catch (error) {
-      // If the ping fails, the connection is stale.
       const host = this.getMachineAddress(machineId);
       console.log(`[ViamService] ⚪️ Ping failed for ${host}. Cleaning up stale connection.`);
-      this.disconnect(machineId); // Self-heal by removing the dead client.
+      this.disconnect(machineId);
       return 'offline';
     }
   }
@@ -108,9 +107,7 @@ class ViamService {
       const resources = await client.resourceNames();
       const hasStockSensor = resources.some(r => r.name === 'langer_fill');
       
-      if (!hasStockSensor) {
-        return [];
-      }
+      if (!hasStockSensor) return [];
 
       const sensor = new VIAM.SensorClient(client, 'langer_fill');
       const readings = await sensor.getReadings();
@@ -127,7 +124,7 @@ class ViamService {
         });
     } catch (error) {
       console.error(`[ViamService] ❌ Stock readings failed for ${machineId}:`, error);
-      this.disconnect(machineId); // Disconnect on error to force a fresh connection next time.
+      this.disconnect(machineId);
       return [];
     }
   }
@@ -139,9 +136,7 @@ class ViamService {
       const resources = await client.resourceNames();
       const hasTempSensor = resources.some(r => r.name === 'gateway');
 
-      if (!hasTempSensor) {
-        return [];
-      }
+      if (!hasTempSensor) return [];
 
       const sensor = new VIAM.SensorClient(client, 'gateway');
       const readings = await sensor.getReadings();
@@ -155,8 +150,28 @@ class ViamService {
       }));
     } catch (error) {
       console.error(`[ViamService] ❌ Temperature readings failed for ${machineId}:`, error);
-      this.disconnect(machineId); // Disconnect on error to force a fresh connection next time.
+      this.disconnect(machineId);
       return [];
+    }
+  }
+
+  /**
+   * Fetches the last 24 hours of temperature data via our secure API endpoint.
+   */
+  async getTemperatureHistory(tempPartId: string, sensorId: string): Promise<TemperatureDataPoint[]> {
+    try {
+      // ✨ FIX: The function now accepts and passes the correct tempPartId.
+      const response = await fetch(`/api/temperature-history?tempPartId=${tempPartId}&sensorId=${sensorId}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch history');
+      }
+      const data = await response.json();
+      // Convert ISO date strings back to Date objects for the chart
+      return data.map((d: { x: string; y: number }) => ({ ...d, x: new Date(d.x) }));
+    } catch (error) {
+      console.error(`[ViamService] ❌ Temp history failed for ${tempPartId} | ${sensorId}:`, error);
+      throw error; // Re-throw to be caught by the UI
     }
   }
   
@@ -168,16 +183,14 @@ class ViamService {
       const cameraName = overlay ? 'langer_fill_view' : 'camera';
       const hasCamera = resources.some(r => r.name === cameraName);
 
-      if (!hasCamera) {
-        return null;
-      }
+      if (!hasCamera) return null;
       
       const camera = new VIAM.CameraClient(client, cameraName);
       const image = await camera.getImage();
       return URL.createObjectURL(new Blob([image], { type: 'image/jpeg' }));
     } catch (error) {
       console.error(`[ViamService] ❌ Camera failed for ${machineId}:`, error);
-      this.disconnect(machineId); // Disconnect on error to force a fresh connection next time.
+      this.disconnect(machineId);
       return null;
     }
   }
@@ -191,13 +204,17 @@ class ViamService {
     return names[id] || id;
   }
   
-  private getTempStatus(temp: number, id: string): 'normal' | 'warning' | 'critical' {
+  public getTempStatus(temp: number, id: string): 'normal' | 'warning' | 'critical' {
     const name = this.getSensorName(id).toLowerCase();
     if (name.includes('freezer')) { 
-      return temp > -5 || temp < -20 ? 'critical' : 'normal'; 
+      if (temp > -5) return 'critical';
+      if (temp < -20) return 'warning';
+      return 'normal'; 
     }
     if (name.includes('fridge')) { 
-      return temp > 8 || temp < 0 ? 'warning' : 'normal'; 
+      if (temp > 8) return 'critical';
+      if (temp < 0) return 'warning';
+      return 'normal'; 
     }
     return temp > 25 || temp < 15 ? 'warning' : 'normal';
   }
