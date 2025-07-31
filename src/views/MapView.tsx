@@ -75,7 +75,8 @@ export function MapView() {
   const alertStoreIds = new Set(alerts.filter(a => !a.read).map(a => a.storeId));
 
   const getStoreMarkerStatus = (store: StoreData) => {
-    if (store.status === 'offline') return 'offline';
+    // ✨ FIX: A store is offline only if both machines are offline.
+    if (store.stockStatus === 'offline' && store.tempStatus === 'offline') return 'offline';
     if (alertStoreIds.has(store.id)) return 'alert';
     return 'ok';
   };
