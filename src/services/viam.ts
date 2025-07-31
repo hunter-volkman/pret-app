@@ -70,6 +70,7 @@ class ViamService {
         return client;
       } catch (error: any) {
         if (error?.message?.includes('timed out')) {
+          // This is an expected error for offline machines, so we log it gently.
           console.log(`[ViamService] ⚪️ Connection timed out for ${host}. Machine is likely offline.`);
         } else {
           console.error(`[ViamService] ❌ Unexpected error connecting to ${host}:`, error);
@@ -90,7 +91,8 @@ class ViamService {
       return 'offline';
     }
     try {
-      await client.resourceNames();
+      // Use getMachineStatus as a more direct and lightweight health check.
+      await client.getMachineStatus();
       return 'online';
     } catch (error) {
       const host = this.getMachineAddress(machineId);
@@ -102,7 +104,7 @@ class ViamService {
 
   async getStockReadings(machineId: string): Promise<StockRegion[]> {
     const client = await this.connect(machineId);
-    if (!client) return [];
+    if (!client) throw new Error('Viam client is not connected');
     try {
       const resources = await client.resourceNames();
       const hasStockSensor = resources.some(r => r.name === 'langer_fill');
@@ -125,13 +127,13 @@ class ViamService {
     } catch (error) {
       console.error(`[ViamService] ❌ Stock readings failed for ${machineId}:`, error);
       this.disconnect(machineId);
-      return [];
+      throw error; // Re-throw the error
     }
   }
   
   async getTemperatureReadings(machineId: string): Promise<TempSensor[]> {
     const client = await this.connect(machineId);
-    if (!client) return [];
+    if (!client) throw new Error('Viam client is not connected');
     try {
       const resources = await client.resourceNames();
       const hasTempSensor = resources.some(r => r.name === 'gateway');
@@ -151,7 +153,7 @@ class ViamService {
     } catch (error) {
       console.error(`[ViamService] ❌ Temperature readings failed for ${machineId}:`, error);
       this.disconnect(machineId);
-      return [];
+      throw error; // Re-throw the error
     }
   }
 
@@ -160,7 +162,6 @@ class ViamService {
    */
   async getTemperatureHistory(tempPartId: string, sensorId: string): Promise<TemperatureDataPoint[]> {
     try {
-      // ✨ FIX: The function now accepts and passes the correct tempPartId.
       const response = await fetch(`/api/temperature-history?tempPartId=${tempPartId}&sensorId=${sensorId}`);
       if (!response.ok) {
         const errorData = await response.json();
