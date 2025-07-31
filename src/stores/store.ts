@@ -39,10 +39,14 @@ export interface Alert {
   cvImageUrl?: string
 }
 
+// Status for a single machine
+type MachineStatus = 'online' | 'offline';
+
 // The main data type for a store in our app state.
 export interface StoreData extends StoreConfig {
-  // ✨ Add 'connecting' to the possible statuses
-  status: 'online' | 'offline' | 'connecting'
+  // Track each machine's status individually
+  stockStatus: MachineStatus
+  tempStatus: MachineStatus
   stockRegions: StockRegion[]
   tempSensors: TempSensor[]
   lastUpdate?: Date
@@ -77,7 +81,9 @@ export const useStore = create<AppState>()(
     (set, get) => ({
       stores: STORES.map(store => ({
         ...store,
-        status: 'offline',
+        // Initialize individual machine statuses
+        stockStatus: 'offline',
+        tempStatus: 'offline',
         stockRegions: [],
         tempSensors: [],
       })),
@@ -109,20 +115,13 @@ export const useStore = create<AppState>()(
 
       setCurrentStore: (store) => set({ currentStore: store }),
       
-      // ✨ Immediately set status to 'connecting' when toggled on
+      // Simplify toggle to only manage the selected set. Status is handled by the health check.
       toggleStoreSelection: (id) => {
-        const state = get();
-        const newSelected = new Set(state.selectedStores);
-        const isCurrentlySelected = newSelected.has(id);
-
-        if (isCurrentlySelected) {
+        const newSelected = new Set(get().selectedStores);
+        if (newSelected.has(id)) {
           newSelected.delete(id);
-          // When turning off, immediately set to offline and clear data
-          state.updateStore(id, { status: 'offline', stockRegions: [], tempSensors: [] });
         } else {
           newSelected.add(id);
-          // When turning on, set to 'connecting' to provide instant feedback
-          state.updateStore(id, { status: 'connecting' });
         }
         set({ selectedStores: newSelected });
       },
