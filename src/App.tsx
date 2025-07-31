@@ -3,7 +3,7 @@ import { useStore } from './stores/store';
 import { monitor } from './services/monitor';
 import { push } from './services/push';
 import { auth, UserInfo } from './services/auth';
-import { IS_DEMO, STORES } from './config/stores';
+import { IS_DEMO } from './config/stores';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
 import { Loader2, Shield } from 'lucide-react';
@@ -11,7 +11,7 @@ import { StoresView } from './views/StoresView';
 import { MapView } from './views/MapView';
 import { AlertsView } from './views/AlertsView';
 import { CameraView } from './views/CameraView';
-import { viam } from './services/viam';
+import { healthService } from './services/health';
 
 function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
@@ -60,41 +60,42 @@ function LoginScreen() {
 }
 
 function MainAppContent() {
-  const { currentView, selectedStores, stores, toggleStoreSelection, updateStore } = useStore();
+  const { currentView, selectedStores, stores, toggleStoreSelection } = useStore();
   const [userInfo, setUserInfo] = useState<UserInfo | null>(auth.getUserInfo());
 
-  // Update user info when auth state changes
   useEffect(() => {
-    const handleAuthChange = () => {
-      setUserInfo(auth.getUserInfo());
-    };
+    const handleAuthChange = () => setUserInfo(auth.getUserInfo());
     window.addEventListener('authChange', handleAuthChange);
     return () => window.removeEventListener('authChange', handleAuthChange);
   }, []);
 
-  // Global health check loop
+  // ✨ Initialize and manage services via useEffect
   useEffect(() => {
-    const healthCheck = async () => {
-      console.log('🩺 [HealthCheck] Running global status check...');
-      for (const store of STORES) {
-        const status = await viam.pingMachine(store.stockMachineId);
+    // Start the health service to monitor machine connectivity.
+    healthService.start();
+    
+    // Initialize the push notification service.
+    push.initialize();
+
+    // Subscribe to store selection changes to trigger immediate health checks.
+    const unsub = useStore.subscribe(
+      (state, prevState) => {
+        const newSelections = new Set(state.selectedStores);
+        const oldSelections = new Set(prevState.selectedStores);
+        const added = [...newSelections].filter(x => !oldSelections.has(x));
         
-        const currentStore = useStore.getState().stores.find(s => s.id === store.id);
-        if (currentStore && currentStore.status !== status) {
-          updateStore(store.id, { status });
+        if (added.length > 0) {
+          healthService.queueImmediateCheckForStores(added);
         }
       }
+    );
+
+    return () => {
+      healthService.stop();
+      unsub();
     };
-
-    healthCheck();
-    const intervalId = setInterval(healthCheck, 60000);
-
-    return () => clearInterval(intervalId);
-  }, [updateStore]);
-
-  useEffect(() => {
-    push.initialize();
   }, []);
+
 
   useEffect(() => {
     if (IS_DEMO && selectedStores.size === 0 && stores.length > 0) {
