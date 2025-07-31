@@ -14,7 +14,8 @@ export function Header({ userInfo, onLogout }: HeaderProps) {
   const { stores, notificationSubscriptions } = useStore();
   const [showSettings, setShowSettings] = useState(false);
 
-  const onlineStores = stores.filter(store => store.status === 'online').length;
+  // A store is online if either machine is online.
+  const onlineStores = stores.filter(store => store.stockStatus === 'online' || store.tempStatus === 'online').length;
 
   const handleLogout = async () => {
     setShowSettings(false);
@@ -22,7 +23,6 @@ export function Header({ userInfo, onLogout }: HeaderProps) {
   };
   
   const handleSendTestNotification = async () => {
-    // Find the first store the user is subscribed to
     const subscribedStoreId = Array.from(notificationSubscriptions)[0] as string | undefined;
 
     if (!subscribedStoreId) {
@@ -63,15 +63,12 @@ export function Header({ userInfo, onLogout }: HeaderProps) {
   return (
     <header className="bg-white border-b border-gray-100 px-4 sm:px-6 py-3 sticky top-0 z-40">
       <div className="flex items-center justify-between">
-        {/* Left Side: Title */}
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Pret Monitor</h1>
           <p className="text-xs sm:text-sm text-gray-500">Real-time Operations Dashboard</p>
         </div>
         
-        {/* Right Side: All Controls */}
         <div className="flex items-center space-x-3 sm:space-x-4">
-          {/* Online Stores Count - ALWAYS VISIBLE */}
           <div className="flex items-center space-x-2">
             {onlineStores > 0 ? (
               <Wifi className="w-4 h-4 text-green-500" />
@@ -84,7 +81,6 @@ export function Header({ userInfo, onLogout }: HeaderProps) {
             </span>
           </div>
 
-          {/* User Info & Settings Button */}
           {IS_AUTH_ENABLED && userInfo && (
              <div className="flex items-center space-x-2">
                 <div className="bg-white border border-gray-200 rounded-full p-1 pl-3 pr-2 flex items-center space-x-3">
@@ -105,7 +101,6 @@ export function Header({ userInfo, onLogout }: HeaderProps) {
                     )}
                 </div>
 
-                {/* Settings Dropdown */}
                 <div className="relative">
                   <button
                     onClick={() => setShowSettings(!showSettings)}
