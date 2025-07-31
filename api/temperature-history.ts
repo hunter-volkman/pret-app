@@ -15,7 +15,7 @@ async function getViamClient(): Promise<ViamClient> {
   }
 
   viamClient = await createViamClient({
-    serviceHost: 'https://app.viam.com:443',
+    serviceHost: 'https://app.viam.com',
     credentials: {
       type: 'api-key',
       authEntity: apiKeyId,
@@ -55,27 +55,25 @@ export default async function handler(
       endTime
     );
 
-    const chartData = rawData
-      .map(entry => {
-        // ✨ FIX: Add a type guard to ensure payload is an object before accessing its properties.
-        if (entry.payload && typeof entry.payload === 'object' && !Array.isArray(entry.payload) && entry.timeCaptured) {
-          const readings = entry.payload['readings'];
-          if (readings && typeof readings === 'object' && !Array.isArray(readings)) {
-            const payloadObject = readings as Record<string, any>;
-            const sensorReading = payloadObject[sensorId];
-
-            if (sensorReading) {
-              const temp = sensorReading.TempC_SHT ?? sensorReading.TempC_DS;
-              if (typeof temp === 'number' && temp < 100) { 
-                return { x: entry.timeCaptured.toISOString(), y: temp };
-              }
+    // Use `any` to bypass the incompatible type issue during the map operation.
+    const chartData = (rawData as any[])
+      .map((entry) => {
+        const readings = entry.payload?.['readings'];
+        
+        if (readings && typeof readings === 'object' && !Array.isArray(readings)) {
+          const sensorReading = (readings as Record<string, any>)[sensorId as string];
+          
+          if (sensorReading) {
+            const temp = sensorReading.TempC_SHT ?? sensorReading.TempC_DS;
+            if (typeof temp === 'number' && entry.timeCaptured) { 
+              return { x: entry.timeCaptured.toISOString(), y: parseFloat(temp.toFixed(2)) };
             }
           }
         }
         return null;
       })
-      .filter(Boolean)
-      .sort((a, b) => new Date(a!.x).getTime() - new Date(b!.x).getTime());
+      .filter((point): point is { x: string; y: number } => point !== null)
+      .sort((a, b) => new Date(a.x).getTime() - new Date(b.x).getTime());
     
     response.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
     return response.status(200).json(chartData);
