@@ -1,73 +1,82 @@
 import { viam } from './viam'
-import { useStore, Alert } from '../stores/store'
-import { STORES } from '../config/stores'
-import { Store } from '../config/stores'
+import { useStore, Alert, StockRegion, TempSensor } from '../stores/store'
+import { STORES, Store } from '../config/stores'
 
 class MonitorService {
-  private intervals = new Map<string, NodeJS.Timeout>()
+  private intervals = new Map<string, { stock?: NodeJS.Timeout; temp?: NodeJS.Timeout }>();
 
   public start(selectedStores: Set<string>): void {
-    this.stop()
+    this.stop();
     for (const storeId of selectedStores) {
-      const store = STORES.find(s => s.id === storeId)
+      const store = STORES.find(s => s.id === storeId);
       if (!store) {
         console.error(`Monitor start failed: Could not find store with id ${storeId}`);
         continue;
       }
       
-      const poll = () => this.pollStore(store);
-      poll(); // Initial poll
-      this.intervals.set(storeId, setInterval(poll, 30000));
+      const pollStock = () => this.pollStock(store);
+      const pollTemp = () => this.pollTemp(store);
+
+      pollStock(); // Initial poll
+      pollTemp();
+
+      this.intervals.set(storeId, {
+        stock: setInterval(pollStock, 30000),
+        temp: setInterval(pollTemp, 30000),
+      });
     }
   }
 
   public stop(): void {
-    this.intervals.forEach(interval => clearInterval(interval))
-    this.intervals.clear()
+    this.intervals.forEach(timers => {
+      if (timers.stock) clearInterval(timers.stock);
+      if (timers.temp) clearInterval(timers.temp);
+    });
+    this.intervals.clear();
   }
 
-  private async pollStore(store: Store): Promise<void> {
+  private async pollStock(store: Store): Promise<void> {
     try {
-      // Proactively check the store's status from our reliable health checker.
-      // If it's offline, don't even attempt to poll for data.
-      const currentStore = useStore.getState().stores.find(s => s.id === store.id);
-      if (currentStore?.status === 'offline') {
-        // This is a normal condition, so we can comment out the log to keep the console clean.
-        // console.log(`[Monitor] Skipping poll for offline store: ${store.name}`);
-        return;
-      }
-      await this.updateWithRealData(store);
+      const currentStoreState = useStore.getState().stores.find(s => s.id === store.id);
+      if (currentStoreState?.stockStatus === 'offline') return;
+
+      const stockRegions = await viam.getStockReadings(store.stockMachineId);
+      useStore.getState().updateStore(store.id, {
+        stockRegions,
+        stockStatus: 'online',
+      });
+      this.checkStockAlerts(store, stockRegions);
     } catch (error: any) {
-      // This catch block is now a secondary fallback for unexpected polling errors.
       if (error?.message?.includes('timed out')) {
-        console.log(`[Monitor] ⚪️ Polling timed out for ${store.name}, machine may be offline.`);
+        console.log(`[Monitor] ⚪️ Stock poll timed out for ${store.name}.`);
       } else {
-        console.error(`[Monitor] ❌ Polling failed for ${store.name}:`, error)
+        console.error(`[Monitor] ❌ Stock poll failed for ${store.name}:`, error.message);
       }
-      useStore.getState().updateStore(store.id, { status: 'offline' })
+      useStore.getState().updateStore(store.id, { stockStatus: 'offline' });
     }
   }
 
-  private async updateWithRealData(store: Store): Promise<void> {
-    const [stockRegions, tempSensors] = await Promise.all([
-      viam.getStockReadings(store.stockMachineId),
-      viam.getTemperatureReadings(store.tempMachineId)
-    ]);
-    
-    // The health checker is the sole source of truth for online/offline status.
-    // This function is now only responsible for updating data readings.
-    useStore.getState().updateStore(store.id, {
-      stockRegions,
-      tempSensors
-    });
-    
-    this.checkAlerts(store, stockRegions, tempSensors);
+  private async pollTemp(store: Store): Promise<void> {
+    try {
+      const currentStoreState = useStore.getState().stores.find(s => s.id === store.id);
+      if (currentStoreState?.tempStatus === 'offline') return;
+        
+      const tempSensors = await viam.getTemperatureReadings(store.tempMachineId);
+      useStore.getState().updateStore(store.id, {
+        tempSensors,
+        tempStatus: 'online',
+      });
+      this.checkTempAlerts(store, tempSensors);
+    } catch (error: any) {
+      if (error?.message?.includes('timed out')) {
+        console.log(`[Monitor] ⚪️ Temp poll timed out for ${store.name}.`);
+      } else {
+        console.error(`[Monitor] ❌ Temp poll failed for ${store.name}:`, error.message);
+      }
+      useStore.getState().updateStore(store.id, { tempStatus: 'offline' });
+    }
   }
   
-  /**
-   * Triggers a push notification by sending the alert details to our backend API.
-   * @param alert The alert object to send a notification for.
-   */
   private async triggerPushNotification(alert: Alert) {
     try {
       console.log(`[Monitor] Triggering push notification for store: ${alert.storeId}`);
@@ -85,21 +94,20 @@ class MonitorService {
     }
   }
 
-  private async checkAlerts(store: Store, stockRegions: any[], tempSensors: any[]): Promise<void> {
+  private async checkStockAlerts(store: Store, stockRegions: StockRegion[]): Promise<void> {
     const { alerts, addAlert } = useStore.getState();
     const recentAlertCutoff = Date.now() - (5 * 60 * 1000); // 5 minutes ago
 
-    // Check for stock alerts
     const lowStock = stockRegions.filter(r => r.status === 'empty' || r.status === 'low');
-    if (lowStock.length > 2) { // Trigger if more than 2 regions are low/empty
+    if (lowStock.length > 2) {
       const hasRecentStockAlert = alerts.some(a => 
         a.storeId === store.id && a.type === 'stock' && a.timestamp.getTime() > recentAlertCutoff
       );
       
       if (!hasRecentStockAlert) {
         const [imageUrl, cvImageUrl] = await Promise.all([
-          viam.getCameraImage(store.stockMachineId, false),
-          viam.getCameraImage(store.stockMachineId, true)
+          viam.getCameraImage(store.stockMachineId, false).catch(() => undefined),
+          viam.getCameraImage(store.stockMachineId, true).catch(() => undefined)
         ]);
 
         const newAlert: Alert = {
@@ -118,11 +126,15 @@ class MonitorService {
         };
         
         addAlert(newAlert);
-        this.triggerPushNotification(newAlert); // 👈 NOTIFICATION SENT
+        this.triggerPushNotification(newAlert);
       }
     }
+  }
 
-    // Check for temperature alerts
+  private async checkTempAlerts(store: Store, tempSensors: TempSensor[]): Promise<void> {
+    const { alerts, addAlert } = useStore.getState();
+    const recentAlertCutoff = Date.now() - (5 * 60 * 1000);
+
     const tempIssues = tempSensors.filter(t => t.status !== 'normal');
     if (tempIssues.length > 0) {
       const hasRecentTempAlert = alerts.some(a => 
@@ -145,7 +157,7 @@ class MonitorService {
         };
 
         addAlert(newAlert);
-        this.triggerPushNotification(newAlert); // 👈 NOTIFICATION SENT
+        this.triggerPushNotification(newAlert);
       }
     }
   }
