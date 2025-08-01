@@ -47,11 +47,7 @@ class MonitorService {
       });
       this.checkStockAlerts(store, stockRegions);
     } catch (error: any) {
-      if (error?.message?.includes('timed out')) {
-        console.log(`[Monitor] ⚪️ Stock poll timed out for ${store.name}.`);
-      } else {
-        console.error(`[Monitor] ❌ Stock poll failed for ${store.name}:`, error.message);
-      }
+      console.error(`[Monitor] ❌ Stock poll failed for ${store.name}:`, error.message);
       useStore.getState().updateStore(store.id, { stockStatus: 'offline' });
     }
   }
@@ -68,11 +64,7 @@ class MonitorService {
       });
       this.checkTempAlerts(store, tempSensors);
     } catch (error: any) {
-      if (error?.message?.includes('timed out')) {
-        console.log(`[Monitor] ⚪️ Temp poll timed out for ${store.name}.`);
-      } else {
-        console.error(`[Monitor] ❌ Temp poll failed for ${store.name}:`, error.message);
-      }
+      console.error(`[Monitor] ❌ Temp poll failed for ${store.name}:`, error.message);
       useStore.getState().updateStore(store.id, { tempStatus: 'offline' });
     }
   }
@@ -116,7 +108,7 @@ class MonitorService {
           storeName: store.name,
           type: 'stock',
           title: 'Low Stock Alert',
-          message: `${lowStock.length} regions need immediate restocking at ${store.name}.`,
+          message: `${lowStock.length} regions need restocking at ${store.name}.`,
           timestamp: new Date(),
           severity: lowStock.some(r => r.status === 'empty') ? 'high' : 'medium',
           read: false,
@@ -143,17 +135,19 @@ class MonitorService {
       
       if (!hasRecentTempAlert) {
         const criticalIssues = tempIssues.filter(t => t.status === 'critical');
+        const firstIssue = tempIssues[0];
+
         const newAlert: Alert = {
           id: `temp-${store.id}-${Date.now()}`,
           storeId: store.id,
           storeName: store.name,
           type: 'temperature',
           title: 'Temperature Alert',
-          message: `Temperature issue detected in ${tempIssues[0].name} at ${store.name}.`,
+          message: `Temperature issue detected in ${firstIssue.name} at ${store.name}.`,
           timestamp: new Date(),
           severity: criticalIssues.length > 0 ? 'high' : 'medium',
           read: false,
-          sensors: tempIssues.map(t => t.id)
+          sensors: tempIssues.map(t => ({ id: t.id, value: t.temperature }))
         };
 
         addAlert(newAlert);
