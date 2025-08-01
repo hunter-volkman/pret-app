@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Wifi, WifiOff, Settings, LogOut, User, Send } from 'lucide-react';
+import { Wifi, WifiOff, Settings, LogOut, User, Send, Trash2 } from 'lucide-react';
 import { useStore } from '../stores/store';
 import { UserInfo } from '../services/auth';
 import { IS_DEMO, toggleDemo } from '../config/stores';
@@ -11,10 +11,9 @@ interface HeaderProps {
 }
 
 export function Header({ userInfo, onLogout }: HeaderProps) {
-  const { stores, notificationSubscriptions } = useStore();
+  const { stores, notificationSubscriptions, clearAlerts } = useStore();
   const [showSettings, setShowSettings] = useState(false);
 
-  // A store is online if either machine is online.
   const onlineStores = stores.filter(store => store.stockStatus === 'online' || store.tempStatus === 'online').length;
 
   const handleLogout = async () => {
@@ -22,15 +21,20 @@ export function Header({ userInfo, onLogout }: HeaderProps) {
     await onLogout();
   };
   
+  const handleClearAlerts = () => {
+    if (confirm('Are you sure you want to clear all alerts? This cannot be undone.')) {
+      clearAlerts();
+    }
+    setShowSettings(false);
+  }
+
   const handleSendTestNotification = async () => {
     const subscribedStoreId = Array.from(notificationSubscriptions)[0] as string | undefined;
-
     if (!subscribedStoreId) {
-      alert("Please subscribe to at least one store's notifications (using the bell icon) to send a test.");
+      alert("Please subscribe to a store's notifications to send a test.");
       return;
     }
 
-    console.log(`[UI Test] Sending test notification for store: ${subscribedStoreId}`);
     try {
       const response = await fetch('/api/notify', {
         method: 'POST',
@@ -41,16 +45,15 @@ export function Header({ userInfo, onLogout }: HeaderProps) {
           message: `This is a test alert for one of your subscribed stores.`
         }),
       });
-      
       if (response.ok) {
-        alert("Test notification sent successfully! You should receive it shortly.");
+        alert("Test notification sent successfully!");
       } else {
         const errorData = await response.json();
-        alert(`Failed to send test notification. Server responded with status ${response.status}: ${errorData.error || 'Unknown Error'}`);
+        alert(`Failed to send test notification: ${errorData.error || 'Unknown Error'}`);
       }
     } catch (error) {
       console.error('Failed to send test notification:', error);
-      alert('An error occurred while sending the test notification. Check the console.');
+      alert('An error occurred while sending the test notification.');
     }
     setShowSettings(false);
   };
@@ -70,11 +73,7 @@ export function Header({ userInfo, onLogout }: HeaderProps) {
         
         <div className="flex items-center space-x-3 sm:space-x-4">
           <div className="flex items-center space-x-2">
-            {onlineStores > 0 ? (
-              <Wifi className="w-4 h-4 text-green-500" />
-            ) : (
-              <WifiOff className="w-4 h-4 text-red-500" />
-            )}
+            {onlineStores > 0 ? <Wifi className="w-4 h-4 text-green-500" /> : <WifiOff className="w-4 h-4 text-red-500" />}
             <span className="text-sm font-medium text-gray-700">
               {onlineStores}/{stores.length}
               <span className="hidden sm:inline"> online</span>
@@ -85,15 +84,11 @@ export function Header({ userInfo, onLogout }: HeaderProps) {
              <div className="flex items-center space-x-2">
                 <div className="bg-white border border-gray-200 rounded-full p-1 pl-3 pr-2 flex items-center space-x-3">
                     <div className="text-sm text-right">
-                      <div className="font-semibold text-gray-900 leading-tight truncate">
-                        {getUserDisplayName()}
-                      </div>
-                      <div className="text-xs text-gray-500 leading-tight truncate hidden sm:block">
-                        {userInfo.email}
-                      </div>
+                      <div className="font-semibold text-gray-900 leading-tight truncate">{getUserDisplayName()}</div>
+                      <div className="text-xs text-gray-500 leading-tight truncate hidden sm:block">{userInfo.email}</div>
                     </div>
                     {userInfo.picture ? (
-                       <img src={userInfo.picture} alt="User" className="w-8 h-8 rounded-full" />
+                        <img src={userInfo.picture} alt="User" className="w-8 h-8 rounded-full" />
                     ) : (
                       <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
                         <User className="w-4 h-4 text-white" />
@@ -102,10 +97,7 @@ export function Header({ userInfo, onLogout }: HeaderProps) {
                 </div>
 
                 <div className="relative">
-                  <button
-                    onClick={() => setShowSettings(!showSettings)}
-                    className="p-2 bg-white border border-gray-200 rounded-full hover:bg-gray-100 transition-colors group"
-                  >
+                  <button onClick={() => setShowSettings(!showSettings)} className="p-2 bg-white border border-gray-200 rounded-full hover:bg-gray-100 transition-colors group">
                     <Settings className="w-5 h-5 text-gray-600 group-hover:rotate-90 transition-transform duration-300" />
                   </button>
                   {showSettings && (
@@ -118,39 +110,28 @@ export function Header({ userInfo, onLogout }: HeaderProps) {
                             <span className="text-sm font-medium text-gray-700">Demo Mode</span>
                             <p className="text-xs text-gray-500">Auto-select all stores</p>
                           </div>
-                          <button
-                            onClick={toggleDemo}
-                            className={`px-3 py-1 text-xs font-bold rounded-lg transition-all duration-200 ${
-                              IS_DEMO 
-                                ? 'bg-blue-500 text-white shadow' 
-                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                            }`}
-                          >
+                          <button onClick={toggleDemo} className={`px-3 py-1 text-xs font-bold rounded-lg transition-all duration-200 ${IS_DEMO ? 'bg-blue-500 text-white shadow' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
                             {IS_DEMO ? 'ON' : 'OFF'}
                           </button>
                         </div>
 
-                        <button
-                          onClick={handleSendTestNotification}
-                          className="w-full flex items-center justify-center space-x-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-2 rounded-xl transition-colors font-medium"
-                        >
+                        <button onClick={handleSendTestNotification} className="w-full flex items-center justify-center space-x-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-2 rounded-xl transition-colors font-medium">
                           <Send className="w-4 h-4" />
                           <span>Send Test Notification</span>
                         </button>
                         
+                        <button onClick={handleClearAlerts} className="w-full flex items-center justify-center space-x-2 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 p-2 rounded-xl transition-colors font-medium">
+                          <Trash2 className="w-4 h-4" />
+                          <span>Clear All Alerts</span>
+                        </button>
+
                         <div className="border-t border-gray-200 !my-2" />
-                        <button
-                          onClick={handleLogout}
-                          className="w-full flex items-center justify-center space-x-2 text-red-600 hover:text-red-700 hover:bg-red-50 p-2 rounded-xl transition-colors font-medium"
-                        >
+                        <button onClick={handleLogout} className="w-full flex items-center justify-center space-x-2 text-red-600 hover:text-red-700 hover:bg-red-50 p-2 rounded-xl transition-colors font-medium">
                           <LogOut className="w-4 h-4" />
                           <span>Sign Out</span>
                         </button>
                       </div>
-                      <div 
-                        className="fixed inset-0 z-40" 
-                        onClick={() => setShowSettings(false)} 
-                      />
+                      <div className="fixed inset-0 z-40" onClick={() => setShowSettings(false)} />
                     </>
                   )}
                 </div>
