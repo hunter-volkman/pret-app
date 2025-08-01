@@ -88,8 +88,6 @@ export function SensorModal({ store, sensor, onClose }: SensorModalProps) {
             <div className="h-full w-full">
               <TemperatureChart 
                 data={chartData} 
-                machineId={store.tempMachineId}
-                sensorId={sensor.id}
                 complianceBands={complianceBands} 
               />
             </div>
