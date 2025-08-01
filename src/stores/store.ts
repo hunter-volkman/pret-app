@@ -4,7 +4,6 @@ import { STORES } from '../config/stores'
 import { Store as StoreConfig } from '../config/stores'
 import { push } from '../services/push'
 
-// Data shape for a computer vision stock detection region
 export interface StockRegion {
   id: string
   name: string
@@ -12,7 +11,6 @@ export interface StockRegion {
   status: 'ok' | 'low' | 'empty'
 }
 
-// Data shape for an IoT temperature sensor reading
 export interface TempSensor {
   id: string
   name: string
@@ -22,7 +20,6 @@ export interface TempSensor {
   status: 'normal' | 'warning' | 'critical'
 }
 
-// Data shape for a system-generated alert
 export interface Alert {
   id:string
   storeId: string
@@ -34,17 +31,14 @@ export interface Alert {
   severity: 'low' | 'medium' | 'high'
   read: boolean
   regions?: string[]
-  sensors?: string[]
+  sensors?: { id: string, value: number }[] // Capture sensor ID and its value
   imageUrl?: string
   cvImageUrl?: string
 }
 
-// Status for a single machine
 type MachineStatus = 'online' | 'offline';
 
-// The main data type for a store in our app state.
 export interface StoreData extends StoreConfig {
-  // Track each machine's status individually
   stockStatus: MachineStatus
   tempStatus: MachineStatus
   stockRegions: StockRegion[]
@@ -61,7 +55,6 @@ interface AppState {
   currentStore: StoreData | null
   selectedStores: Set<string>
   alertFilterStoreId: string | null
-  /** A set of store IDs the user is subscribed to for push notifications. */
   notificationSubscriptions: Set<string>
 
   // Actions
@@ -71,8 +64,8 @@ interface AppState {
   toggleStoreSelection: (id: string) => void
   addAlert: (alert: Alert) => void
   markAlertRead: (id: string) => void
+  clearAlerts: () => void
   setAlertFilter: (storeId: string | null) => void
-  /** Toggles a user's push notification subscription for a specific store. */
   toggleNotificationSubscription: (storeId: string) => Promise<void>
 }
 
@@ -81,7 +74,6 @@ export const useStore = create<AppState>()(
     (set, get) => ({
       stores: STORES.map(store => ({
         ...store,
-        // Initialize individual machine statuses
         stockStatus: 'offline',
         tempStatus: 'offline',
         stockRegions: [],
@@ -101,21 +93,18 @@ export const useStore = create<AppState>()(
       })),
       
       setCurrentView: (view) => set((state) => {
-      const newState: Partial<AppState> = { currentView: view };
-      // If we are navigating away from the camera view, clear the current store.
-      if (state.currentView === 'camera' && view !== 'camera') {
-        newState.currentStore = null;
-      }
-      // Keep existing logic for alerts view
-      if (state.currentView === 'alerts' && view !== 'alerts') {
-        newState.alertFilterStoreId = null;
-      }
-      return newState;
-    }),
+        const newState: Partial<AppState> = { currentView: view };
+        if (state.currentView === 'camera' && view !== 'camera') {
+          newState.currentStore = null;
+        }
+        if (state.currentView === 'alerts' && view !== 'alerts') {
+          newState.alertFilterStoreId = null;
+        }
+        return newState;
+      }),
 
       setCurrentStore: (store) => set({ currentStore: store }),
       
-      // Simplify toggle to only manage the selected set. Status is handled by the health check.
       toggleStoreSelection: (id) => {
         const newSelected = new Set(get().selectedStores);
         if (newSelected.has(id)) {
@@ -136,6 +125,8 @@ export const useStore = create<AppState>()(
         )
       })),
 
+      clearAlerts: () => set({ alerts: [] }),
+
       setAlertFilter: (storeId) => set({ alertFilterStoreId: storeId, currentView: 'alerts' }),
 
       toggleNotificationSubscription: async (storeId) => {
@@ -145,12 +136,10 @@ export const useStore = create<AppState>()(
         if (isSubscribed) {
           await push.unsubscribe(storeId);
           newSubscriptions.delete(storeId);
-          console.log('UI: Unsubscribed from', storeId);
         } else {
           const subscription = await push.subscribe(storeId);
-          if (subscription) { // Only update UI if subscription was successful
+          if (subscription) {
             newSubscriptions.add(storeId);
-            console.log('UI: Subscribed to', storeId);
           }
         }
         
@@ -163,7 +152,7 @@ export const useStore = create<AppState>()(
         alerts: state.alerts,
         notificationSubscriptions: state.notificationSubscriptions,
        }),
-        storage: createJSONStorage(() => localStorage, {
+       storage: createJSONStorage(() => localStorage, {
         replacer: (key, value) => {
           if (value instanceof Set) {
             return { _type: 'Set', value: Array.from(value) };
@@ -174,10 +163,7 @@ export const useStore = create<AppState>()(
           return value;
         },
         reviver: (key, value: any) => {
-          if (key === 'notificationSubscriptions' && Array.isArray(value)) {
-            return new Set(value);
-          }
-          if (typeof value === 'object' && value !== null && value._type === 'Set') {
+          if (value && value._type === 'Set') {
             return new Set(value.value);
           }
           if (key === 'timestamp' && typeof value === 'string') {
