@@ -3,30 +3,13 @@ import { X, Thermometer, Loader2, AlertTriangle, Battery, Droplets } from 'lucid
 import { StoreData, TempSensor } from '../stores/store';
 import { viam, TemperatureDataPoint } from '../services/viam';
 import { TemperatureChart } from './TemperatureChart';
+import { getSensorConfig } from '../config/sensors';
 
 interface SensorModalProps {
   store: StoreData;
   sensor: TempSensor;
   onClose: () => void;
 }
-
-const getComplianceBands = (sensorName: string) => {
-  const name = sensorName.toLowerCase();
-  if (name.includes('fridge')) {
-    return [
-      { y: 8, label: 'Critical Upper Limit', color: '#EF4444' },
-      { y: 0, label: 'Warning Lower Limit', color: '#F59E0B' },
-    ];
-  }
-  if (name.includes('freezer')) {
-    return [
-      { y: -5, label: 'Critical Upper Limit', color: '#EF4444' },
-      { y: -20, label: 'Warning Lower Limit', color: '#F59E0B' },
-    ];
-  }
-  return [];
-}
-
 
 export function SensorModal({ store, sensor, onClose }: SensorModalProps) {
   const [status, setStatus] = useState<'loading' | 'error' | 'success'>('loading');
@@ -36,7 +19,6 @@ export function SensorModal({ store, sensor, onClose }: SensorModalProps) {
     const fetchData = async () => {
       try {
         setStatus('loading');
-        // ✨ FIX: Pass the correct store.tempPartId to the service function
         const data = await viam.getTemperatureHistory(store.tempPartId, sensor.id);
         setChartData(data);
         setStatus(data.length > 0 ? 'success' : 'error');
@@ -46,7 +28,6 @@ export function SensorModal({ store, sensor, onClose }: SensorModalProps) {
       }
     };
     fetchData();
-    // ✨ FIX: Update the dependency array to use tempPartId
   }, [store.tempPartId, sensor.id]);
 
   useEffect(() => {
@@ -60,8 +41,10 @@ export function SensorModal({ store, sensor, onClose }: SensorModalProps) {
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose();
   };
-
-  const complianceBands = getComplianceBands(sensor.name);
+  
+  // Get compliance bands directly from our new centralized config
+  const sensorConfig = getSensorConfig(store.tempMachineId, sensor.id);
+  const complianceBands = sensorConfig?.bands || [];
 
   return (
     <div
@@ -103,7 +86,12 @@ export function SensorModal({ store, sensor, onClose }: SensorModalProps) {
           )}
           {status === 'success' && (
             <div className="h-full w-full">
-              <TemperatureChart data={chartData} complianceBands={complianceBands} />
+              <TemperatureChart 
+                data={chartData} 
+                machineId={store.tempMachineId}
+                sensorId={sensor.id}
+                complianceBands={complianceBands} 
+              />
             </div>
           )}
         </main>
