@@ -4,8 +4,6 @@ import { TemperatureDataPoint } from '../services/viam';
 
 interface TemperatureChartProps {
   data: TemperatureDataPoint[];
-  machineId: string; // Kept for future-proofing, though not used in this version
-  sensorId: string; // Kept for future-proofing, though not used in this version
   complianceBands?: { y: number; y2?: number; label: string; color: string }[];
 }
 
@@ -16,12 +14,16 @@ export function TemperatureChart({ data, complianceBands = [] }: TemperatureChar
       height: '100%',
       zoom: { autoScaleYaxis: true },
       toolbar: { show: true, tools: { download: false, selection: true, zoom: true, zoomin: true, zoomout: true, pan: true, reset: true } },
+      animations: {
+        // Fix: Disable animations to prevent label misalignment on initial render
+        enabled: false,
+      },
     },
     dataLabels: { enabled: false },
     stroke: {
       curve: 'smooth',
       width: 2,
-      colors: ['#3B82F6'] // A single, consistent line color
+      colors: ['#3B82F6']
     },
     fill: {
       type: 'gradient',
@@ -41,7 +43,6 @@ export function TemperatureChart({ data, complianceBands = [] }: TemperatureChar
     yaxis: {
       labels: {
         formatter: (value) => {
-          // Fix: Handle null values to prevent crash
           if (typeof value !== 'number') return '';
           return `${value.toFixed(1)}°C`;
         },
@@ -52,7 +53,6 @@ export function TemperatureChart({ data, complianceBands = [] }: TemperatureChar
       x: { format: 'MMM dd, hh:mm TT' },
       y: {
         formatter: (value) => {
-          // Fix: Handle null values to prevent crash
           if (typeof value !== 'number') return '';
           return `${value.toFixed(2)}°C`;
         },
@@ -68,17 +68,19 @@ export function TemperatureChart({ data, complianceBands = [] }: TemperatureChar
         fillColor: band.color,
         opacity: 0.15,
         label: {
-          borderColor: 'transparent',
+          borderColor: band.color,
           style: {
-            color: '#333',
-            background: band.color,
+            color: '#fff',
+            // Fix: Restore the background color to the label style
+            background: band.color, 
             fontSize: '10px',
             fontWeight: 600,
             padding: { left: 5, right: 5, top: 2, bottom: 2 }
           },
           text: band.label,
-          position: 'left',
-          offsetX: 10,
+          position: 'right',
+          offsetX: -5,
+          offsetY: 0,
         },
       })),
     },
