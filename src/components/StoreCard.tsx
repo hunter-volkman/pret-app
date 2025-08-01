@@ -1,34 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDown, MapPin, Thermometer, Box, Wifi, WifiOff, AlertCircle, Bell, BellOff, AlertTriangle, Loader2, ChevronRight } from 'lucide-react';
 import { useStore, StoreData, TempSensor } from '../stores/store';
+import { SparklineChart } from './SparklineChart';
 
-// Helper for stock region grid colors
-const getFillColor = (status: 'ok' | 'low' | 'empty') => {
-  switch (status) {
-    case 'ok': return 'bg-green-100 text-green-800';
-    case 'low': return 'bg-yellow-100 text-yellow-800';
-    case 'empty': return 'bg-red-100 text-red-800';
-    default: return 'bg-gray-100 text-gray-800';
-  }
-};
+type TrendData = Record<string, { x: string; y: number }[]>;
 
-// Helpers for sensor status colors
-const getTempColor = (status: 'normal' | 'warning' | 'critical') => {
-  switch (status) {
-    case 'normal': return 'bg-green-500';
-    case 'warning': return 'bg-yellow-500';
-    case 'critical': return 'bg-red-500';
-    default: return 'bg-gray-500';
-  }
-};
-const getTempTextColor = (status: 'normal' | 'warning' | 'critical') => {
-  switch (status) {
-    case 'normal': return 'text-gray-800';
-    case 'warning': return 'text-yellow-600';
-    case 'critical': return 'text-red-600';
-    default: return 'text-gray-600';
-  }
-};
+const getFillColor = (status: 'ok' | 'low' | 'empty') => ({
+  'ok': 'bg-green-100 text-green-800',
+  'low': 'bg-yellow-100 text-yellow-800',
+  'empty': 'bg-red-100 text-red-800',
+})[status] || 'bg-gray-100 text-gray-800';
+
+const getTempUi = (status: 'normal' | 'warning' | 'critical') => ({
+  'normal': { color: 'bg-green-500', textColor: 'text-gray-800', chartColor: '#10B981' },
+  'warning': { color: 'bg-yellow-500', textColor: 'text-yellow-600', chartColor: '#F59E0B' },
+  'critical': { color: 'bg-red-500', textColor: 'text-red-600', chartColor: '#EF4444' },
+})[status] || { color: 'bg-gray-500', textColor: 'text-gray-600', chartColor: '#6B7280' };
 
 interface StoreCardProps {
   store: StoreData;
@@ -50,6 +37,8 @@ const MachineStatusIndicator = ({ name, status }: { name: string, status: 'onlin
 
 export function StoreCard({ store, isSelected, onToggle, onHeaderClick, onSensorClick }: StoreCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [trends, setTrends] = useState<TrendData | null>(null);
+  const [isLoadingTrends, setIsLoadingTrends] = useState(false);
   const { alerts, notificationSubscriptions, toggleNotificationSubscription } = useStore();
   
   const alertsForStore = alerts.filter(a => a.storeId === store.id && !a.read);
@@ -71,6 +60,17 @@ export function StoreCard({ store, isSelected, onToggle, onHeaderClick, onSensor
   const isStoreOnline = store.stockStatus === 'online' || store.tempStatus === 'online';
   const isPolling = isSelected && isStoreOnline && !store.lastUpdate;
 
+  useEffect(() => {
+    if (expanded && !trends && !isLoadingTrends) {
+      setIsLoadingTrends(true);
+      fetch(`/api/temperature-trends?tempPartId=${store.tempPartId}&hours=6`)
+        .then(res => res.json())
+        .then(data => setTrends(data))
+        .catch(err => console.error("Failed to fetch trends:", err))
+        .finally(() => setIsLoadingTrends(false));
+    }
+  }, [expanded, trends, isLoadingTrends, store.tempPartId]);
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300">
       <div className="p-5">
@@ -89,11 +89,7 @@ export function StoreCard({ store, isSelected, onToggle, onHeaderClick, onSensor
             )}
           </div>
           <div className="flex items-center space-x-2">
-            <button 
-              onClick={(e) => { e.stopPropagation(); toggleNotificationSubscription(store.id); }}
-              className={`p-2 rounded-lg transition-colors ${isSubscribed ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-              aria-label={isSubscribed ? 'Unsubscribe from notifications' : 'Subscribe to notifications'}
-            >
+            <button onClick={(e) => { e.stopPropagation(); toggleNotificationSubscription(store.id); }} className={`p-2 rounded-lg transition-colors ${isSubscribed ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`} aria-label={isSubscribed ? 'Unsubscribe' : 'Subscribe'}>
               {isSubscribed ? <Bell className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
             </button>
             <label className="relative inline-flex items-center cursor-pointer" onClick={e => e.stopPropagation()}>
@@ -104,37 +100,19 @@ export function StoreCard({ store, isSelected, onToggle, onHeaderClick, onSensor
         </div>
 
         <div className={`mt-4 border rounded-lg p-3 flex flex-col sm:flex-row items-center justify-between transition-colors duration-300 ${isSelected ? 'bg-gray-50/80 border-gray-200' : 'bg-gray-100 border-transparent'}`}>
-          {!isSelected ? (
-            <p className="text-center text-sm text-gray-400 w-full">Enable monitoring to see live data</p>
-          ) : isPolling ? (
-            <div className="flex items-center justify-center w-full text-sm text-gray-500">
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Fetching live data...
-            </div>
-          ) : !isStoreOnline ? (
-            <div className="flex items-center justify-center w-full text-sm text-gray-500">
-              <WifiOff className="w-4 h-4 mr-2" />
-              All machines are offline
-            </div>
-          ) : (
-            <>
-              <div className="flex sm:flex-row flex-col sm:items-center w-full justify-between gap-3 sm:gap-4 text-sm text-gray-600">
-                  <div className="flex items-center justify-center space-x-4">
-                      <div className="flex items-center space-x-1.5">
-                          <Box className="w-4 h-4" />
-                          <span>{stockRegions.length > 0 ? `${stockRegions.length} Regions` : '-'}</span>
-                      </div>
-                      <div className="flex items-center space-x-1.5">
-                          <Thermometer className="w-4 h-4" />
-                          <span>{tempSensors.length > 0 ? `${tempSensors.length} Sensors` : '-'}</span>
-                      </div>
-                  </div>
-                  <div className={`flex items-center space-x-1.5 font-semibold px-3 py-1 rounded-full w-full sm:w-auto justify-center ${activeIssuesCount > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                      {activeIssuesCount > 0 ? <AlertTriangle className="w-4 h-4" /> : '✅'}
-                      <span>{activeIssuesCount} Issue{activeIssuesCount !== 1 && 's'}</span>
-                  </div>
+          {!isSelected ? <p className="text-center text-sm text-gray-400 w-full">Enable monitoring to see live data</p> : 
+           isPolling ? <div className="flex items-center justify-center w-full text-sm text-gray-500"><Loader2 className="w-4 h-4 mr-2 animate-spin" />Fetching live data...</div> :
+           !isStoreOnline ? <div className="flex items-center justify-center w-full text-sm text-gray-500"><WifiOff className="w-4 h-4 mr-2" />All machines are offline</div> : (
+            <div className="flex sm:flex-row flex-col sm:items-center w-full justify-between gap-3 sm:gap-4 text-sm text-gray-600">
+              <div className="flex items-center justify-center space-x-4">
+                <div className="flex items-center space-x-1.5"><Box className="w-4 h-4" /><span>{stockRegions.length > 0 ? `${stockRegions.length} Regions` : '-'}</span></div>
+                <div className="flex items-center space-x-1.5"><Thermometer className="w-4 h-4" /><span>{tempSensors.length > 0 ? `${tempSensors.length} Sensors` : '-'}</span></div>
               </div>
-            </>
+              <div className={`flex items-center space-x-1.5 font-semibold px-3 py-1 rounded-full w-full sm:w-auto justify-center ${activeIssuesCount > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                {activeIssuesCount > 0 ? <AlertTriangle className="w-4 h-4" /> : '✅'}
+                <span>{activeIssuesCount} Issue{activeIssuesCount !== 1 && 's'}</span>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -165,20 +143,25 @@ export function StoreCard({ store, isSelected, onToggle, onHeaderClick, onSensor
                 <div className="pt-4">
                   <h4 className="text-sm font-semibold text-gray-800 mb-3">Temperature Sensors</h4>
                   <div className="space-y-2">
-                    {tempSensors.map((sensor) => (
-                      <button
-                        key={sensor.id}
-                        onClick={() => onSensorClick(sensor)}
-                        className="w-full flex items-center justify-between text-sm p-3 bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:border-blue-400 group transition-colors text-left"
-                      >
-                        <span className="font-medium text-gray-700">{sensor.name}</span>
-                        <div className="flex items-center space-x-2">
-                          <span className={`font-bold ${getTempTextColor(sensor.status)}`}>{sensor.temperature.toFixed(1)}°C</span>
-                          <div className={`w-2.5 h-2.5 rounded-full ${getTempColor(sensor.status)}`} />
-                          <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
-                        </div>
-                      </button>
-                    ))}
+                    {tempSensors.map((sensor) => {
+                      const uiProps = getTempUi(sensor.status);
+                      const trendData = trends?.[sensor.id] || [];
+                      return (
+                        <button key={sensor.id} onClick={() => onSensorClick(sensor)} className="w-full flex items-center justify-between text-sm p-3 bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:border-blue-400 group transition-colors text-left">
+                          <span className="font-medium text-gray-700">{sensor.name}</span>
+                          <div className="flex items-center space-x-2">
+                            {isLoadingTrends ? <div className="w-[80px] h-[35px] bg-gray-200 rounded animate-pulse" /> : trends ? (
+                              <div className="opacity-70">
+                                <SparklineChart data={trendData} color={uiProps.chartColor} />
+                              </div>
+                            ) : <div className="w-[80px]" />}
+                            <span className={`font-bold w-16 text-right ${uiProps.textColor}`}>{sensor.temperature.toFixed(1)}°C</span>
+                            <div className={`w-2.5 h-2.5 rounded-full ${uiProps.color}`} />
+                            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                          </div>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               )}
