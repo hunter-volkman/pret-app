@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Wifi, WifiOff, Settings, LogOut, User, Send, Trash2 } from 'lucide-react';
 import { useStore } from '../stores/store';
 import { UserInfo } from '../services/auth';
-import { IS_DEMO, toggleDemo } from '../config/stores';
 import { IS_AUTH_ENABLED } from '../config/auth';
 
 interface HeaderProps {
@@ -81,7 +80,7 @@ export function Header({ userInfo, onLogout }: HeaderProps) {
           </div>
 
           {IS_AUTH_ENABLED && userInfo && (
-             <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2">
                 <div className="bg-white border border-gray-200 rounded-full p-1 pl-3 pr-2 flex items-center space-x-3">
                     <div className="text-sm text-right">
                       <div className="font-semibold text-gray-900 leading-tight truncate">{getUserDisplayName()}</div>
@@ -105,16 +104,6 @@ export function Header({ userInfo, onLogout }: HeaderProps) {
                       <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-2xl p-4 z-50 min-w-[280px] space-y-3 animate-in fade-in-0 slide-in-from-top-2 duration-200">
                         <h3 className="font-bold text-gray-800 text-base">Settings</h3>
                         
-                        <div className="flex items-center justify-between p-2 bg-gray-50 rounded-xl">
-                          <div>
-                            <span className="text-sm font-medium text-gray-700">Demo Mode</span>
-                            <p className="text-xs text-gray-500">Auto-select all stores</p>
-                          </div>
-                          <button onClick={toggleDemo} className={`px-3 py-1 text-xs font-bold rounded-lg transition-all duration-200 ${IS_DEMO ? 'bg-blue-500 text-white shadow' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
-                            {IS_DEMO ? 'ON' : 'OFF'}
-                          </button>
-                        </div>
-
                         <button onClick={handleSendTestNotification} className="w-full flex items-center justify-center space-x-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-2 rounded-xl transition-colors font-medium">
                           <Send className="w-4 h-4" />
                           <span>Send Test Notification</span>
@@ -135,7 +124,7 @@ export function Header({ userInfo, onLogout }: HeaderProps) {
                     </>
                   )}
                 </div>
-             </div>
+              </div>
           )}
         </div>
       </div>
