@@ -3,7 +3,6 @@ import { useStore } from './stores/store';
 import { monitor } from './services/monitor';
 import { push } from './services/push';
 import { auth, UserInfo } from './services/auth';
-import { IS_DEMO } from './config/stores';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
 import { Loader2, Shield } from 'lucide-react';
@@ -60,7 +59,7 @@ function LoginScreen() {
 }
 
 function MainAppContent() {
-  const { currentView, selectedStores, stores, toggleStoreSelection } = useStore();
+  const { currentView, selectedStores } = useStore();
   const [userInfo, setUserInfo] = useState<UserInfo | null>(auth.getUserInfo());
 
   useEffect(() => {
@@ -69,39 +68,24 @@ function MainAppContent() {
     return () => window.removeEventListener('authChange', handleAuthChange);
   }, []);
 
-  // ✨ Initialize and manage services via useEffect
   useEffect(() => {
-    // Start the health service to monitor machine connectivity.
     healthService.start();
-    
-    // Initialize the push notification service.
     push.initialize();
-
-    // Subscribe to store selection changes to trigger immediate health checks.
     const unsub = useStore.subscribe(
       (state, prevState) => {
         const newSelections = new Set(state.selectedStores);
         const oldSelections = new Set(prevState.selectedStores);
         const added = [...newSelections].filter(x => !oldSelections.has(x));
-        
         if (added.length > 0) {
           healthService.queueImmediateCheckForStores(added);
         }
       }
     );
-
     return () => {
       healthService.stop();
       unsub();
     };
   }, []);
-
-
-  useEffect(() => {
-    if (IS_DEMO && selectedStores.size === 0 && stores.length > 0) {
-      stores.forEach(store => toggleStoreSelection(store.id));
-    }
-  }, [stores, selectedStores, toggleStoreSelection]);
 
   useEffect(() => {
     if (selectedStores.size > 0) {
@@ -119,14 +103,12 @@ function MainAppContent() {
   return (
     <div className="flex flex-col h-dvh bg-gray-50">
       <Header userInfo={userInfo} onLogout={handleLogout} />
-      
       <main className="flex-1 overflow-y-auto">
         {currentView === 'stores' && <StoresView />}
         {currentView === 'map' && <MapView />}
         {currentView === 'alerts' && <AlertsView />}
         {currentView === 'camera' && <CameraView />}
       </main>
-
       <Navigation />
     </div>
   );
