@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, MapPin, Thermometer, Box, Wifi, WifiOff, AlertCircle, Bell, BellOff, AlertTriangle, Loader2, ChevronRight } from 'lucide-react';
+import { ChevronDown, MapPin, Thermometer, Box, Wifi, WifiOff, AlertCircle, Bell, BellOff, AlertTriangle, Loader2, ChevronRight, History, Info } from 'lucide-react';
 import { useStore, StoreData, TempSensor } from '../stores/store';
 import { SparklineChart } from './SparklineChart';
 
@@ -23,6 +23,7 @@ interface StoreCardProps {
   onToggle: () => void;
   onHeaderClick: () => void;
   onSensorClick: (sensor: TempSensor) => void;
+  onViewHistoryClick: () => void;
 }
 
 const MachineStatusIndicator = ({ name, status }: { name: string, status: 'online' | 'offline' }) => {
@@ -35,7 +36,7 @@ const MachineStatusIndicator = ({ name, status }: { name: string, status: 'onlin
   );
 };
 
-export function StoreCard({ store, isSelected, onToggle, onHeaderClick, onSensorClick }: StoreCardProps) {
+export function StoreCard({ store, isSelected, onToggle, onHeaderClick, onSensorClick, onViewHistoryClick }: StoreCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [trends, setTrends] = useState<TrendData | null>(null);
   const [isLoadingTrends, setIsLoadingTrends] = useState(false);
@@ -125,10 +126,17 @@ export function StoreCard({ store, isSelected, onToggle, onHeaderClick, onSensor
           </button>
           
           {expanded && (
-            <div className="px-5 pb-5 bg-gray-50 border-t border-gray-200 animate-in fade-in-0 duration-300">
-              {stockRegions.length > 0 && (
-                <div className="pt-4">
-                  <h4 className="text-sm font-semibold text-gray-800 mb-3">Stock Regions</h4>
+            <div className="px-5 pb-5 bg-gray-50/70 border-t border-gray-200 animate-in fade-in-0 duration-300 divide-y divide-gray-200">
+              {/* --- Stock Regions Section --- */}
+              <div className="py-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-gray-800">Stock Regions</h4>
+                  <button onClick={onViewHistoryClick} className="flex items-center space-x-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 p-1.5 rounded-lg hover:bg-blue-50 transition-colors">
+                    <History className="w-4 h-4" />
+                    <span>VIEW HISTORY</span>
+                  </button>
+                </div>
+                {stockRegions.length > 0 ? (
                   <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
                     {sortedStockRegions.map((region) => (
                       <div key={region.id} className={`text-center p-2 rounded-lg ${getFillColor(region.status)}`}>
@@ -137,11 +145,17 @@ export function StoreCard({ store, isSelected, onToggle, onHeaderClick, onSensor
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-              {tempSensors.length > 0 && (
-                <div className="pt-4">
-                  <h4 className="text-sm font-semibold text-gray-800 mb-3">Temperature Sensors</h4>
+                ) : (
+                  <div className="flex items-center justify-center text-center p-3 text-sm text-gray-500 bg-gray-100 rounded-lg">
+                    <Info className="w-4 h-4 mr-2 flex-shrink-0" />
+                    No live stock data available.
+                  </div>
+                )}
+              </div>
+              {/* --- Temperature Sensors Section --- */}
+              <div className="py-4">
+                <h4 className="text-sm font-semibold text-gray-800 mb-3">Temperature Sensors</h4>
+                {tempSensors.length > 0 ? (
                   <div className="space-y-2">
                     {tempSensors.map((sensor) => {
                       const uiProps = getTempUi(sensor.status);
@@ -163,8 +177,13 @@ export function StoreCard({ store, isSelected, onToggle, onHeaderClick, onSensor
                       )
                     })}
                   </div>
-                </div>
-              )}
+                ) : (
+                   <div className="flex items-center justify-center text-center p-3 text-sm text-gray-500 bg-gray-100 rounded-lg">
+                    <Info className="w-4 h-4 mr-2 flex-shrink-0" />
+                    No live temperature data available.
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
