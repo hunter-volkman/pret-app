@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Camera, ArrowLeft, Loader2 } from 'lucide-react';
 import { useStore } from '../stores/store';
 import { viam } from '../services/viam';
+import { formatTimeInZone } from '../utils/time';
 import * as VIAM from '@viamrobotics/sdk';
 
 export function CameraView() {
@@ -12,18 +13,20 @@ export function CameraView() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isStreamReady, setStreamReady] = useState(false);
   
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState('');
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamClientRef = useRef<VIAM.StreamClient | null>(null);
   const streamNameRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (isStreamReady) {
-      const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    if (isStreamReady && currentStore) {
+      const timer = setInterval(() => {
+        setCurrentTime(formatTimeInZone(new Date(), currentStore.timezone));
+      }, 1000);
       return () => clearInterval(timer);
     }
-  }, [isStreamReady]);
+  }, [isStreamReady, currentStore]);
 
   useEffect(() => {
     if (!currentStore) return;
@@ -176,8 +179,8 @@ export function CameraView() {
           <span>LIVE</span>
         </div>
 
-        <div className={`absolute bottom-3 right-3 bg-black/50 text-white px-3 py-1 rounded-md text-sm font-mono backdrop-blur-sm transition-opacity duration-300 ${isStreamReady ? 'opacity-100' : 'opacity-0'}`}>
-          {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+        <div className={`absolute bottom-3 right-3 bg-black/60 text-white px-3 py-1 rounded-md text-sm font-mono backdrop-blur-sm transition-opacity duration-300 ${isStreamReady ? 'opacity-100' : 'opacity-0'}`}>
+          {currentTime}
         </div>
         
         {isUpgrading && (
