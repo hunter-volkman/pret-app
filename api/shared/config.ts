@@ -53,7 +53,13 @@ export const STORES: Store[] = [
     tempPartId: 'f4981097-a2fd-4998-91ae-20f2c9e9f5f1',
     timezone: 'America/New_York',
     openingHours: {
-      0: { open: "08:00", close: "18:00" }, 1: { open: "07:00", close: "20:00" }, 2: { open: "07:00", close: "20:00" }, 3: { open: "07:00", close: "20:00" }, 4: { open: "07:00", close: "20:00" }, 5: { open: "07:00", close: "20:00" }, 6: { open: "08:00", close: "18:00" },
+      0: { open: "08:00", close: "18:00" }, 
+      1: { open: "07:00", close: "20:00" }, 
+      2: { open: "07:00", close: "20:00" }, 
+      3: { open: "07:00", close: "20:00" }, 
+      4: { open: "07:00", close: "20:00" }, 
+      5: { open: "07:00", close: "20:00" }, 
+      6: { open: "08:00", close: "18:00" },
     }
   },
   {
@@ -67,7 +73,12 @@ export const STORES: Store[] = [
     tempPartId: 'bddd09bd-7c2d-4a45-98af-0c524b1a9959',
     timezone: 'America/Los_Angeles',
     openingHours: {
-      0: null, 1: { open: "07:30", close: "17:00" }, 2: { open: "07:30", close: "17:00" }, 3: { open: "07:30", close: "17:00" }, 4: { open: "07:30", close: "17:00" }, 5: { open: "07:30", close: "17:00" }, 6: { open: "08:00", close: "16:00" },
+      0: null, 1: { open: "07:30", close: "17:00" }, 
+      2: { open: "07:30", close: "17:00" }, 
+      3: { open: "07:30", close: "17:00" }, 
+      4: { open: "07:30", close: "17:00" }, 
+      5: { open: "07:30", close: "17:00" }, 
+      6: { open: "08:00", close: "16:00" },
     }
   },
   {
