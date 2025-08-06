@@ -1,6 +1,6 @@
 import { kv } from '@vercel/kv';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import webpush from 'web-push'; // CORRECTED IMPORT
+import webpush from 'web-push';
 
 // Configure web-push with VAPID keys from server-side environment variables
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
