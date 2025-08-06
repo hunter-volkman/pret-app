@@ -21,7 +21,7 @@ export function SensorModal({ store, sensor, onClose }: SensorModalProps) {
         setStatus('loading');
         const data = await viam.getTemperatureHistory(store.tempPartId, sensor.id);
         setChartData(data);
-        setStatus(data.length > 0 ? 'success' : 'error');
+        setStatus('success');
       } catch (error) {
         console.error("Failed to fetch sensor history:", error);
         setStatus('error');
@@ -50,7 +50,7 @@ export function SensorModal({ store, sensor, onClose }: SensorModalProps) {
       className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[9999] backdrop-blur-sm"
       onClick={handleBackdropClick}
     >
-      <div className="bg-white rounded-2xl max-w-4xl w-full h-[80vh] flex flex-col">
+      <div className="bg-white rounded-2xl max-w-4xl w-full h-[80vh] flex flex-col animate-in fade-in-0 zoom-in-95 duration-300">
         <header className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="bg-blue-100 text-blue-600 p-2 rounded-lg">
@@ -80,46 +80,54 @@ export function SensorModal({ store, sensor, onClose }: SensorModalProps) {
             <div className="flex flex-col items-center justify-center h-full text-red-600 bg-red-50 rounded-lg">
               <AlertTriangle className="w-10 h-10 mb-3" />
               <h4 className="font-bold text-lg">Could Not Load Data</h4>
-              <p className="text-sm">No historical data found or an error occurred.</p>
+            	<p className="text-sm">An error occurred while fetching data.</p>
             </div>
           )}
           {status === 'success' && (
-            <div className="h-full w-full">
-              <TemperatureChart 
-                data={chartData} 
-                complianceBands={complianceBands} 
-              />
-            </div>
+            chartData.length > 0 ? (
+              <div className="h-full w-full">
+                <TemperatureChart 
+                  data={chartData} 
+                  complianceBands={complianceBands} 
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-gray-500 text-center">
+                <Thermometer className="w-12 h-12 mb-4 text-gray-400" />
+                <h4 className="font-bold text-lg">No Historical Data</h4>
+                <p className="text-sm max-w-sm">No temperature history was recorded for this sensor in the last 24 hours.</p>
+              </div>
+            )
           )}
         </main>
         
         <footer className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center justify-center sm:justify-start gap-x-3 text-xs sm:text-sm text-gray-600">
-              <div className="flex items-center space-x-1.5 flex-shrink-0">
-                <Thermometer className="w-4 h-4" />
-                <span>Latest: <strong className="text-gray-900">{sensor.temperature.toFixed(1)}°C</strong></span>
-              </div>
-              {sensor.humidity && (
-                <div className="flex items-center space-x-1.5 flex-shrink-0">
-                  <Droplets className="w-4 h-4" />
-                  <span>Humidity: <strong className="text-gray-900">{sensor.humidity.toFixed(1)}%</strong></span>
-                </div>
-              )}
-              {sensor.battery && (
-                <div className="flex items-center space-x-1.5 flex-shrink-0">
-                  <Battery className="w-4 h-4" />
-                  <span>Battery: <strong className="text-gray-900">{sensor.battery.toFixed(2)}V</strong></span>
-                </div>
-              )}
-            </div>
-            <button
-              onClick={onClose}
-              className="w-full sm:w-auto bg-gray-200 text-gray-800 px-5 py-2 rounded-lg font-medium hover:bg-gray-300"
-            >
-              Close
-            </button>
-          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center justify-center sm:justify-start gap-x-3 text-xs sm:text-sm text-gray-600">
+              <div className="flex items-center space-x-1.5 flex-shrink-0">
+                <Thermometer className="w-4 h-4" />
+                <span>Latest: <strong className="text-gray-900">{sensor.temperature.toFixed(1)}°C</strong></span>
+              </div>
+              {sensor.humidity && (
+                <div className="flex items-center space-x-1.5 flex-shrink-0">
+                  <Droplets className="w-4 h-4" />
+                  <span>Humidity: <strong className="text-gray-900">{sensor.humidity.toFixed(1)}%</strong></span>
+                </div>
+              )}
+              {sensor.battery && (
+                <div className="flex items-center space-x-1.5 flex-shrink-0">
+                  <Battery className="w-4 h-4" />
+                  <span>Battery: <strong className="text-gray-900">{sensor.battery.toFixed(2)}V</strong></span>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={onClose}
+              className="w-full sm:w-auto bg-gray-200 text-gray-800 px-5 py-2 rounded-lg font-medium hover:bg-gray-300"
+            >
+              Close
+            </button>
+          </div>
         </footer>
       </div>
     </div>
