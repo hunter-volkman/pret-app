@@ -65,12 +65,12 @@ async function fetchImageForSlot(dataClient: DataClient, store: Store, targetTim
         startTime,
         endTime,
     });
-    
-    // Crucially, we only ask for the single best match for this slot.
+
+    // Only ask for the single best match for the slot
     const result = await dataClient.binaryDataByFilter(filter, 1, undefined, undefined, true);
 
     if (!result.data || result.data.length === 0) {
-        return null; // No image found in this window.
+        return null; // No image found in the window
     }
 
     const image = result.data[0] as any;
@@ -106,25 +106,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const client = await getViamClient();
         const dataClient = client.dataClient;
 
-        // 1. Generate all the 30-minute time slots we need to query.
+        // 1. Generate all the 30-minute time slots to query
         const timeSlots = generateTimeSlots(store, date);
 
         if (timeSlots.length === 0) {
-            return res.status(200).json([]); // Store closed or not yet open.
+            return res.status(200).json([]); // Store closed
         }
 
-        // 2. Create an array of promises to fetch an image for each slot.
+        // 2. Create an array of promises to fetch an image for each slot
         const fetchPromises = timeSlots.map(slot => 
             fetchImageForSlot(dataClient, store, slot)
         );
 
-        // 3. Execute all fetches concurrently for maximum speed.
+        // 3. Execute all fetches concurrently for maximum response speed
         const results = await Promise.all(fetchPromises);
 
-        // 4. Filter out any slots where no image was found.
+        // 4. Filter out any slots where no image was found for that slot
         const foundImages = results.filter((image): image is { timestamp: string; imageUrl: string } => image !== null);
 
-        // 5. Send the curated list to the frontend.
+        // 5. Send curated list of images from Viam data (to the frontend)
         res.setHeader('Cache-Control', 'public, max-age=1800, s-maxage=1800'); // Cache for 30 mins
         return res.status(200).json(foundImages);
 
