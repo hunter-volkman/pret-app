@@ -10,7 +10,11 @@ const apiKey = process.env.VIAM_API_KEY;
 if (!apiKeyId || !apiKey) throw new Error('Viam API credentials are not configured.');
 viamClient = await createViamClient({
 serviceHost: 'https://app.viam.com',
-credentials: { type: 'api-key', authEntity: apiKeyId, payload: apiKey },
+credentials: {
+    type: 'api-key',
+    authEntity: apiKeyId,
+    payload: apiKey
+},
 });
 return viamClient;
 }
