@@ -7,25 +7,25 @@ const SENSOR_TYPES = {
     thresholds: { critical: 5, warning: 1 },
     bands: [
       { y: 5, label: 'Upper Limit (5°C)', color: '#EF4444' },
-      { y: 1, label: 'Lower Limit (1°C)', color: '#F59E0B' },
+      { y: 1, label: 'Lower Limit (1°C)', color: '#1D4ED8' },
     ],
     alerting: { upperLimit: 5, firstAlertMinutes: 45, secondAlertMinutes: 90 },
   },
   LANGAR: {
     displayName: 'Langar',
-    thresholds: { critical: 8, warning: 1 },
+    thresholds: { critical: 5, warning: 1 },
     bands: [
-      { y: 8, label: 'Upper Limit (8°C)', color: '#EF4444' },
-      { y: 1, label: 'Lower Limit (1°C)', color: '#F59E0B' },
+      { y: 5, label: 'Upper Limit (5°C)', color: '#EF4444' },
+      { y: 1, label: 'Lower Limit (1°C)', color: '#1D4ED8' },
     ],
-    alerting: { upperLimit: 8, firstAlertMinutes: 45, secondAlertMinutes: 90 },
+    alerting: { upperLimit: 5, firstAlertMinutes: 45, secondAlertMinutes: 90 },
   },
   FREEZER: {
     displayName: 'Freezer',
     thresholds: { critical: -17.8, warning: -22 },
     bands: [
       { y: -17.8, label: 'Upper Limit (-17.8°C)', color: '#EF4444' },
-      { y: -22, label: 'Lower Limit (-22°C)', color: '#F59E0B' },
+      { y: -22, label: 'Lower Limit (-22°C)', color: '#1D4ED8' },
     ],
     alerting: { upperLimit: -17.8, firstAlertMinutes: 45, secondAlertMinutes: 90 },
   },
@@ -41,27 +41,46 @@ const SENSOR_TYPES = {
 const STORE_SENSOR_MAPPINGS: Record<string, Record<string, { type: keyof typeof SENSOR_TYPES; displayName: string }>> = {
   // 36th & 5th (Temp Machine ID: 948e0595-d307-425f-bd55-108e52046c2b)
   '948e0595-d307-425f-bd55-108e52046c2b': {
-    'sensor-1': { type: 'FRIDGE', displayName: 'Front Drinks Fridge' },
-    'sensor-2': { type: 'FRIDGE', displayName: 'Milk Fridge' },
-    'sensor-3': { type: 'LANGAR', displayName: 'Pastry Display' },
-    'sensor-4': { type: 'FRIDGE', displayName: 'Sandwich Fridge 1' },
-    'sensor-5': { type: 'FREEZER', displayName: 'Walk-in Freezer' },
-    'sensor-6': { type: 'FRIDGE', displayName: 'Sandwich Fridge 2' },
-    'sensor-7': { type: 'FRIDGE', displayName: 'Yogurt Display' },
+    'sensor-1': { type: 'LANGAR', displayName: 'US_LANGARS_12' },
+    'sensor-2': { type: 'LANGAR', displayName: 'US_LANGARS_14' },
+    'sensor-3': { type: 'LANGAR', displayName: 'US_LANGARS_12' },
+    'sensor-4': { type: 'LANGAR', displayName: 'US_LANGARS_11' },
+    'sensor-5': { type: 'FREEZER', displayName: 'US_FREEZER_3' },
+    'sensor-6': { type: 'FRIDGE', displayName: 'WALK_IN_FRIDGE_2' },
+    'sensor-7': { type: 'FRIDGE', displayName: 'REACH_IN_5' },
+    'sensor-8': { type: 'FRIDGE', displayName: 'WALK_IN_FRIDGE' },
+    'sensor-9': { type: 'FREEZER', displayName: 'US_FREEZER_6' },
+    'sensor-10': { type: 'FREEZER', displayName: 'US_FREEZER_7' },
   },
   // Union Square (Temp Machine ID: 27971efd-baaa-4cb5-b5d0-2b5468daf0b4)
   '27971efd-baaa-4cb5-b5d0-2b5468daf0b4': {
-    'sensor-1': { type: 'FRIDGE', displayName: 'Guest Fridge 1' },
-    'sensor-2': { type: 'FRIDGE', displayName: 'Guest Fridge 2' },
-    'sensor-3': { type: 'FRIDGE', displayName: 'Milk Station' },
-    'sensor-4': { type: 'FRIDGE', displayName: 'BOH Fridge 1' },
-    'sensor-5': { type: 'FREEZER', displayName: 'BOH Freezer' },
-    'sensor-6': { type: 'FRIDGE', displayName: 'BOH Fridge 2' },
-    'sensor-7': { type: 'LANGAR', displayName: 'Pastry Case' },
-    'sensor-8': { type: 'FRIDGE', displayName: 'Lowboy 1' },
-    'sensor-9': { type: 'FRIDGE', displayName: 'Lowboy 2' },
-    'sensor-10': { type: 'AMBIENT', displayName: 'Ambient Kitchen' },
-    'sensor-11': { type: 'AMBIENT', displayName: 'Ambient Seating' },
+    'sensor-1': { type: 'FRIDGE', displayName: 'WALK_IN_FRIDGE' },
+    'sensor-2': { type: 'FRIDGE', displayName: 'WALK_IN_FRIDGE_2' },
+    'sensor-3': { type: 'LANGAR', displayName: 'US_LANGARS_15' },
+    'sensor-4': { type: 'LANGAR', displayName: 'US_LANGARS_12' },
+    'sensor-5': { type: 'LANGAR', displayName: 'US_LANGARS_13' },
+    'sensor-6': { type: 'LANGAR', displayName: 'US_LANGARS_14' },
+    'sensor-7': { type: 'FRIDGE', displayName: 'REACH_IN_6' },
+    'sensor-8': { type: 'FRIDGE', displayName: 'REACH_IN_FRIDGE_8' },
+    'sensor-9': { type: 'FREEZER', displayName: 'US_FREEZER_10' },
+    'sensor-10': { type: 'FRIDGE', displayName: 'REACH_IN_7' },
+    'sensor-11': { type: 'FREEZER', displayName: 'US_FREEZER_9' },
+  },
+  // Westwood/UCLA (Temp Machine ID: 4330c1e3-6a68-487c-8288-ce0124772bce)
+  '4330c1e3-6a68-487c-8288-ce0124772bce': {
+    'sensor-1': { type: 'FRIDGE', displayName: 'MILK_FRIDGE' },
+    'sensor-2': { type: 'LANGAR', displayName: 'US_LANGARS_12' },
+    'sensor-3': { type: 'LANGAR', displayName: 'US_LANGARS_11' },
+    'sensor-4': { type: 'FRIDGE', displayName: 'REACH_IN_1' }
+  },
+  // Century City Mall (Temp Machine ID: fc6778ff-e3a0-4295-a52d-d92580fc2e81)
+  'fc6778ff-e3a0-4295-a52d-d92580fc2e81': {
+    'sensor-1': { type: 'LANGAR', displayName: 'US_LANGARS_13' },
+    'sensor-2': { type: 'LANGAR', displayName: 'US_LANGARS_12' },
+    'sensor-3': { type: 'LANGAR', displayName: 'US_LANGARS_11' },
+    'sensor-4': { type: 'FRIDGE', displayName: 'REACH_IN_3' },
+    'sensor-5': { type: 'FRIDGE', displayName: 'MILK_FRIDGE' },
+    'sensor-6': { type: 'FRIDGE', displayName: 'REACH_IN_1' }
   },
   // Add other stores here using their TEMP MACHINE ID as the key
 };
