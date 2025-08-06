@@ -55,7 +55,7 @@ export default async function handler(
       endTime
     );
 
-    // Use `any` to bypass the incompatible type issue during the map operation.
+    // Use `any` to bypass the incompatible type issue during the map operation (FIX)
     const chartData = (rawData as any[])
       .map((entry) => {
         const readings = entry.payload?.['readings'];
