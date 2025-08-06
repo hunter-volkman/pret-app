@@ -50,7 +50,7 @@ export default async function handler(
     }
 
     response.setHeader('Cache-Control', 'no-store');
-    // IMPORTANT: Pass the id_token through to the client
+    // Pass the id_token through to the client
     return response.status(200).json(tokenData);
 
   } catch (error) {
