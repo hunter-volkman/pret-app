@@ -1,12 +1,12 @@
 {
-  "module_id": "pret:monitor",
+  "module_id": "pret:pret-app",
   "visibility": "public",
   "url": "https://github.com/hunter-volkman/pret-app",
-  "description": "Real-time monitoring for Pret A Manger stores",
+  "description": "Viam Apps for Pret A Manger stores",
   "applications": [
     {
       "name": "app",
-      "type": "single_machine",
+      "type": "multi_machine",
       "entrypoint": "build/index.html"
     }
   ]
