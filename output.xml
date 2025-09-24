@@ -1,0 +1,788 @@
+<combined_files>
+<file path="src/lib/components/MachineCard.svelte">
+<filename>MachineCard.svelte</filename>
+<content>
+<!-- src/lib/components/MachineCard.svelte -->
+<script lang="ts">
+  import { checkMachineStatus } from '$lib/stores/machines';
+  
+  let { machine } = $props();
+  let isOnline = $state(false);
+  let statusChecked = $state(false);
+  
+  $effect(async () => {
+    if (machine?.machineId && !statusChecked) {
+      statusChecked = true;
+      isOnline = await checkMachineStatus(machine.machineId);
+    }
+  });
+</script>
+
+<a 
+  href="/machine/{machine.machineId}" 
+  class="block rounded-lg bg-white p-6 shadow hover:shadow-lg transition-shadow"
+>
+  <div class="flex justify-between items-start">
+    <div>
+      <h3 class="font-semibold">{machine.machineName}</h3>
+      <p class="text-sm text-gray-500 mt-1">{machine.locationName}</p>
+    </div>
+    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {isOnline ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+      {isOnline ? 'Online' : 'Offline'}
+    </span>
+  </div>
+  <div class="mt-4">
+    <span class="text-xs text-gray-400">
+      {machine.machineId.slice(0, 8)}...
+    </span>
+  </div>
+</a>
+</content>
+</file>
+<file path="src/lib/stores/machines.ts">
+<filename>machines.ts</filename>
+<content>
+import { writable, get } from 'svelte/store';
+import { createViamClient, createRobotClient, type ViamClient, type RobotClient } from '@viamrobotics/sdk';
+
+export const viamClient = writable<ViamClient | null>(null);
+export const locations = writable<any[]>([]);
+export const machines = writable<any[]>([]);
+export const accessToken = writable<string>('');
+
+const PRET_ORG_ID = 'cc36ba4b-8053-441e-84fa-136270d34584';
+
+export async function initViam() {
+  let token = '';
+  
+  const userToken = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('userToken='));
+  
+  if (userToken) {
+    const decoded = decodeURIComponent(userToken.split('=')[1]);
+    token = JSON.parse(decoded).access_token;
+  }
+  
+  if (!token && import.meta.env.VITE_VIAM_ACCESS_TOKEN) {
+    token = import.meta.env.VITE_VIAM_ACCESS_TOKEN;
+  }
+  
+  if (!token) throw new Error('No access token');
+  
+  accessToken.set(token);
+  
+  const client = await createViamClient({
+    serviceHost: 'https://app.viam.com',
+    credentials: { type: 'access-token', payload: token }
+  });
+  
+  viamClient.set(client);
+  return client;
+}
+
+export async function loadMachines() {
+  const client = get(viamClient);
+  if (!client) throw new Error('Not initialized');
+  
+  const locationSummaries = await client.appClient.listMachineSummaries(PRET_ORG_ID, []);
+  
+  console.log(`Found ${locationSummaries.length} Pret locations`);
+  
+  const allMachines: any[] = [];
+  
+  locationSummaries.forEach((location: any) => {
+    console.log(`Location: ${location.locationName}`);
+    console.log(`  ID: ${location.locationId}`);
+    console.log(`  Machines: ${location.machineSummaries.length}`);
+    
+    location.machineSummaries.forEach((machine: any) => {
+      const enrichedMachine = {
+        ...machine,
+        locationName: location.locationName,
+        locationId: location.locationId
+      };
+      allMachines.push(enrichedMachine);
+      
+      console.log(`    - ${machine.machineName} (${machine.machineId})`);
+    });
+  });
+  
+  console.log(`Total machines across all locations: ${allMachines.length}`);
+  
+  locations.set(locationSummaries);
+  machines.set(allMachines);
+  
+  return { locations: locationSummaries, machines: allMachines };
+}
+
+export async function checkMachineStatus(machineId: string): Promise<boolean> {
+  const allMachines = get(machines);
+  const machine = allMachines.find(m => m.machineId === machineId);
+  
+  if (!machine || !machine.partSummaries || machine.partSummaries.length === 0) {
+    return false;
+  }
+  
+  const now = Date.now();
+  const fiveMinutesAgo = now - (5 * 60 * 1000);
+  
+  return machine.partSummaries.some((part: any) => {
+    if (!part.lastOnline?.seconds) return false;
+    
+    const lastOnlineMs = Number(part.lastOnline.seconds) * 1000;
+    return lastOnlineMs > fiveMinutesAgo;
+  });
+}
+</content>
+</file>
+<file path="src/lib/index.ts">
+<filename>index.ts</filename>
+<content>
+// place files you want to import through the `$lib` alias in this folder.
+
+</content>
+</file>
+<file path="src/lib/index.ts">
+<filename>index.ts</filename>
+<content>
+// place files you want to import through the `$lib` alias in this folder.
+
+</content>
+</file>
+<file path="src/routes/machine/[id]/+page.svelte">
+<filename>+page.svelte</filename>
+<content>
+<!-- src/routes/machine/[id]/+page.svelte -->
+<script lang="ts">
+  import { page } from '$app/stores';
+  import { onMount } from 'svelte';
+  import { machines, accessToken, checkMachineStatus } from '$lib/stores/machines';
+  import { createRobotClient, type RobotClient } from '@viamrobotics/sdk';
+  import { get } from 'svelte/store';
+  import SensorDisplay from '$lib/components/SensorDisplay.svelte';
+  
+  let robot: RobotClient | null = null;
+  let loading = true;
+  let error = '';
+  let machineData: any = null;
+  let isOnline = false;
+  let resources: any[] = [];
+  
+  onMount(async () => {
+    try {
+      const allMachines = get(machines);
+      machineData = allMachines.find(m => m.machineId === $page.params.id);
+      
+      if (!machineData) {
+        throw new Error('Machine not found');
+      }
+      
+      isOnline = await checkMachineStatus($page.params.id);
+      
+      if (!isOnline) {
+        loading = false;
+        return;
+      }
+      
+      const machineName = machineData.machineName.toLowerCase().replace(/\s+/g, '-');
+      const host = `${machineName}-main.${machineData.locationId}.viam.cloud`;
+      
+      console.log('Connecting to:', host);
+      
+      const token = get(accessToken);
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timeout')), 10000)
+      );
+      
+      const connection = createRobotClient({
+        host,
+        credentials: { 
+          type: 'access-token', 
+          payload: token 
+        },
+        signalingAddress: 'https://app.viam.com:443'
+      });
+      
+      robot = await Promise.race([connection, timeout]) as RobotClient;
+      
+      console.log('Connected to machine');
+      
+      // Get available resources
+      const resourceNames = await robot.resourceNames();
+      resources = resourceNames.filter((r: any) => 
+        r.type === 'component' && r.subtype === 'sensor'
+      );
+      
+      console.log('Available sensors:', resources);
+      
+    } catch (err: any) {
+      error = err.message;
+      console.error('Connection failed:', err);
+    } finally {
+      loading = false;
+    }
+  });
+  
+  onMount(() => {
+    return () => {
+      if (robot) {
+        robot.disconnect();
+      }
+    };
+  });
+</script>
+
+<div class="min-h-screen bg-gray-50">
+  <header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-4">
+      <div class="flex items-center gap-4">
+        <a href="/" class="text-gray-500 hover:text-gray-700">
+          ← Back
+        </a>
+        {#if machineData}
+          <div>
+            <h1 class="text-2xl font-bold">{machineData.machineName}</h1>
+            <p class="text-sm text-gray-500">{machineData.locationName}</p>
+          </div>
+        {/if}
+      </div>
+    </div>
+  </header>
+  
+  <main class="mx-auto max-w-7xl p-8">
+    {#if loading}
+      <div class="text-center py-12">
+        <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600"></div>
+        <p class="mt-2 text-gray-500">Connecting to machine...</p>
+      </div>
+    {:else if !isOnline}
+      <div class="rounded-md bg-yellow-50 p-4">
+        <h3 class="text-sm font-medium text-yellow-800">Machine Offline</h3>
+        <p class="mt-1 text-sm text-yellow-700">This machine is currently offline</p>
+      </div>
+    {:else if error}
+      <div class="rounded-md bg-red-50 p-4">
+        <h3 class="text-sm font-medium text-red-800">Connection Error</h3>
+        <p class="mt-1 text-sm text-red-700">{error}</p>
+      </div>
+    {:else if robot}
+      <div class="space-y-6">
+        <!-- Status Card -->
+        <div class="bg-white rounded-lg shadow p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-medium">Machine Status</h2>
+            <span class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
+              Connected
+            </span>
+          </div>
+          <dl class="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Machine ID</dt>
+              <dd class="text-sm text-gray-900">{machineData.machineId}</dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Location</dt>
+              <dd class="text-sm text-gray-900">{machineData.locationName}</dd>
+            </div>
+          </dl>
+        </div>
+        
+        <!-- Sensors -->
+        {#if resources.length > 0}
+          <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-medium mb-4">Sensors</h2>
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {#each resources as resource}
+                <SensorDisplay {robot} sensorName={resource.name} />
+              {/each}
+            </div>
+          </div>
+        {:else}
+          <div class="bg-white rounded-lg shadow p-6">
+            <p class="text-sm text-gray-500">No sensors available</p>
+          </div>
+        {/if}
+      </div>
+    {/if}
+  </main>
+</div>
+</content>
+</file>
+<file path="src/routes/+layout.svelte">
+<filename>+layout.svelte</filename>
+<content>
+<!-- src/routes/+layout.svelte -->
+<script lang="ts">
+  import '../app.css';
+  import { onMount } from 'svelte';
+  import { initViam, loadMachines } from '$lib/stores/machines';
+  
+  let loading = true;
+  let error = '';
+  
+  onMount(async () => {
+    try {
+      await initViam();
+      await loadMachines();
+    } catch (err: any) {
+      error = err.message;
+    } finally {
+      loading = false;
+    }
+  });
+</script>
+
+{#if loading}
+  <div class="min-h-screen grid place-items-center">
+    <p>Loading...</p>
+  </div>
+{:else if error}
+  <div class="min-h-screen grid place-items-center">
+    <p class="text-red-600">{error}</p>
+  </div>
+{:else}
+  <slot />
+{/if}
+</content>
+</file>
+<file path="src/routes/+page.svelte">
+<filename>+page.svelte</filename>
+<content>
+<!-- src/routes/+page.svelte -->
+<script lang="ts">
+  import { machines } from '$lib/stores/machines';
+  import MachineCard from '$lib/components/MachineCard.svelte';
+</script>
+
+<div class="min-h-screen bg-gray-50">
+  <header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-4">
+      <h1 class="text-2xl font-bold">Pret App</h1>
+    </div>
+  </header>
+  
+  <main class="mx-auto max-w-7xl p-8">
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {#each $machines as machine}
+        <MachineCard {machine} />
+      {/each}
+    </div>
+  </main>
+</div>
+</content>
+</file>
+<file path="src/app.css">
+<filename>app.css</filename>
+<content>
+@import 'tailwindcss';
+
+/* Global app styles */
+html {
+  /* Prevent iOS zoom on input focus */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  /* Better font rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Optional: Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-400 rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-500;
+}
+</content>
+</file>
+<file path="src/app.d.ts">
+<filename>app.d.ts</filename>
+<content>
+// See https://svelte.dev/docs/kit/types#app.d.ts
+// for information about these interfaces
+declare global {
+	namespace App {
+		// interface Error {}
+		// interface Locals {}
+		// interface PageData {}
+		// interface PageState {}
+		// interface Platform {}
+	}
+}
+
+export {};
+
+</content>
+</file>
+<file path="src/app.html">
+<filename>app.html</filename>
+<content>
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>
+
+</content>
+</file>
+<file path="src/app.html">
+<filename>app.html</filename>
+<content>
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>
+
+</content>
+</file>
+<file path="static/robots.txt">
+<filename>robots.txt</filename>
+<content>
+# allow crawling everything by default
+User-agent: *
+Disallow:
+
+</content>
+</file>
+<file path=".gitignore">
+<filename>.gitignore</filename>
+<content>
+node_modules
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+</content>
+</file>
+<file path=".npmrc">
+<filename>.npmrc</filename>
+<content>
+engine-strict=true
+
+</content>
+</file>
+<file path=".prettierignore">
+<filename>.prettierignore</filename>
+<content>
+# Package Managers
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+bun.lock
+bun.lockb
+
+# Miscellaneous
+/static/
+
+</content>
+</file>
+<file path=".prettierrc">
+<filename>.prettierrc</filename>
+<content>
+{
+	"useTabs": true,
+	"singleQuote": true,
+	"trailingComma": "none",
+	"printWidth": 100,
+	"plugins": ["prettier-plugin-svelte", "prettier-plugin-tailwindcss"],
+	"overrides": [
+		{
+			"files": "*.svelte",
+			"options": {
+				"parser": "svelte"
+			}
+		}
+	],
+	"tailwindStylesheet": "./src/app.css"
+}
+
+</content>
+</file>
+<file path="eslint.config.js">
+<filename>eslint.config.js</filename>
+<content>
+import prettier from 'eslint-config-prettier';
+import { fileURLToPath } from 'node:url';
+import { includeIgnoreFile } from '@eslint/compat';
+import js from '@eslint/js';
+import svelte from 'eslint-plugin-svelte';
+import { defineConfig } from 'eslint/config';
+import globals from 'globals';
+import ts from 'typescript-eslint';
+import svelteConfig from './svelte.config.js';
+
+const gitignorePath = fileURLToPath(new URL('./.gitignore', import.meta.url));
+
+export default defineConfig(
+	includeIgnoreFile(gitignorePath),
+	js.configs.recommended,
+	...ts.configs.recommended,
+	...svelte.configs.recommended,
+	prettier,
+	...svelte.configs.prettier,
+	{
+		languageOptions: {
+			globals: { ...globals.browser, ...globals.node }
+		},
+		rules: {
+			// typescript-eslint strongly recommend that you do not use the no-undef lint rule on TypeScript projects.
+			// see: https://typescript-eslint.io/troubleshooting/faqs/eslint/#i-get-errors-from-the-no-undef-rule-about-global-variables-not-being-defined-even-though-there-are-no-typescript-errors
+			'no-undef': 'off'
+		}
+	},
+	{
+		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
+		languageOptions: {
+			parserOptions: {
+				projectService: true,
+				extraFileExtensions: ['.svelte'],
+				parser: ts.parser,
+				svelteConfig
+			}
+		}
+	}
+);
+
+</content>
+</file>
+<file path="Makefile">
+<filename>Makefile</filename>
+<content>
+.PHONY: create update upload build deploy clean dev
+
+VERSION := 0.0.1
+MODULE_NAME := pret-app
+ORG_PUBLIC_NAMESPACE := pret
+
+# Development
+dev:
+	npm run dev
+
+build:
+	npm run build
+
+create:
+	viam module create --name=${MODULE_NAME} --public-namespace=${ORG_PUBLIC_NAMESPACE}
+
+deploy: build
+	tar -czvf pret-app.tar.gz build meta.json
+	viam module upload --version=${VERSION} --platform=any --module=${ORG_PUBLIC_NAMESPACE}:${MODULE_NAME} pret-app.tar.gz
+
+clean:
+	rm -f pret-app.tar.gz
+	rm -rf build
+</content>
+</file>
+<file path="meta.json">
+<filename>meta.json</filename>
+<content>
+{
+  "module_id": "pret:pret-app",
+  "visibility": "public",
+  "url": "https://github.com/hunter-volkman/pret-app",
+  "description": "Viam Apps for Pret A Manger stores",
+  "applications": [
+    {
+      "name": "app",
+      "type": "multi_machine",
+      "entrypoint": "build/index.html"
+    }
+  ]
+}
+
+</content>
+</file>
+<file path="package.json">
+<filename>package.json</filename>
+<content>
+{
+	"name": "temp-app",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"format": "prettier --write .",
+		"lint": "prettier --check . && eslint ."
+	},
+	"devDependencies": {
+		"@eslint/compat": "^1.2.5",
+		"@eslint/js": "^9.22.0",
+		"@sveltejs/adapter-static": "^3.0.8",
+		"@sveltejs/kit": "^2.22.0",
+		"@sveltejs/vite-plugin-svelte": "^6.0.0",
+		"@tailwindcss/vite": "^4.0.0",
+		"@types/node": "^22",
+		"eslint": "^9.22.0",
+		"eslint-config-prettier": "^10.0.1",
+		"eslint-plugin-svelte": "^3.0.0",
+		"globals": "^16.0.0",
+		"prettier": "^3.4.2",
+		"prettier-plugin-svelte": "^3.3.3",
+		"prettier-plugin-tailwindcss": "^0.6.11",
+		"svelte": "^5.0.0",
+		"svelte-check": "^4.0.0",
+		"tailwindcss": "^4.0.0",
+		"typescript": "^5.0.0",
+		"typescript-eslint": "^8.20.0",
+		"vite": "^7.0.4"
+	},
+	"dependencies": {
+		"@viamrobotics/sdk": "^0.51.0"
+	}
+}
+
+</content>
+</file>
+<file path="README.md">
+<filename>README.md</filename>
+<content>
+# sv
+
+Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+
+## Creating a project
+
+If you're seeing this, you've probably already done this step. Congrats!
+
+```sh
+# create a new project in the current directory
+npx sv create
+
+# create a new project in my-app
+npx sv create my-app
+```
+
+## Developing
+
+Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+
+```sh
+npm run dev
+
+# or start the server and open the app in a new browser tab
+npm run dev -- --open
+```
+
+## Building
+
+To create a production version of your app:
+
+```sh
+npm run build
+```
+
+You can preview the production build with `npm run preview`.
+
+> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+
+</content>
+</file>
+<file path="svelte.config.js">
+<filename>svelte.config.js</filename>
+<content>
+import adapter from '@sveltejs/adapter-static';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+
+/** @type {import('@sveltejs/kit').Config} */
+const config = {
+	preprocess: vitePreprocess(),
+	kit: { 
+		adapter: adapter({
+			fallback: 'index.html'
+		})
+	}
+};
+
+export default config;
+</content>
+</file>
+<file path="tsconfig.json">
+<filename>tsconfig.json</filename>
+<content>
+{
+	"extends": "./.svelte-kit/tsconfig.json",
+	"compilerOptions": {
+		"allowJs": true,
+		"checkJs": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"sourceMap": true,
+		"strict": true,
+		"moduleResolution": "bundler"
+	}
+	// Path aliases are handled by https://svelte.dev/docs/kit/configuration#alias
+	// except $lib which is handled by https://svelte.dev/docs/kit/configuration#files
+	//
+	// To make changes to top-level options such as include and exclude, we recommend extending
+	// the generated config; see https://svelte.dev/docs/kit/configuration#typescript
+}
+
+</content>
+</file>
+<file path="vite.config.ts">
+<filename>vite.config.ts</filename>
+<content>
+import tailwindcss from '@tailwindcss/vite';
+import { sveltekit } from '@sveltejs/kit/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+	plugins: [tailwindcss(), sveltekit()]
+});
+
+</content>
+</file>
+</combined_files>
