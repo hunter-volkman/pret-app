@@ -2,8 +2,8 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { onMount, onDestroy } from 'svelte';
-  import { machines, accessToken, checkMachineStatus } from '$lib/stores/machines';
-  import { createRobotClient, type RobotClient } from '@viamrobotics/sdk';
+  import { machines, checkMachineStatus, connectToMachine } from '$lib/stores/machines';
+  import type { RobotClient } from '@viamrobotics/sdk';
   import { get } from 'svelte/store';
   import SensorDisplay from '$lib/components/SensorDisplay.svelte';
   import CameraDisplay from '$lib/components/CameraDisplay.svelte';
@@ -15,9 +15,11 @@
   let isOnline = false;
   let sensors: any[] = [];
   let cameras: any[] = [];
+  let mounted = true;
   
-  onMount(async () => {
+  async function connectAndLoadResources() {
     try {
+      // Get machine data
       const allMachines = get(machines);
       machineData = allMachines.find(m => m.machineId === $page.params.id);
       
@@ -25,6 +27,7 @@
         throw new Error('Machine not found');
       }
       
+      // Check online status
       isOnline = await checkMachineStatus($page.params.id);
       
       if (!isOnline) {
@@ -32,29 +35,20 @@
         return;
       }
       
-      const machineName = machineData.machineName.toLowerCase().replace(/\s+/g, '-');
-      const host = `${machineName}-main.${machineData.locationId}.viam.cloud`;
-      
-      console.log('Connecting to:', host);
-      
-      const token = get(accessToken);
-      const timeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Connection timeout')), 10000)
+      // Connect to machine
+      robot = await connectToMachine(
+        machineData.machineId,
+        machineData.locationId,
+        machineData.machineName
       );
       
-      const connection = createRobotClient({
-        host,
-        credentials: { 
-          type: 'access-token', 
-          payload: token 
-        },
-        signalingAddress: 'https://app.viam.com:443'
-      });
+      if (!mounted) {
+        // Component unmounted during connection
+        if (robot) robot.disconnect();
+        return;
+      }
       
-      robot = await Promise.race([connection, timeout]) as RobotClient;
-      
-      console.log('Connected to machine');
-      
+      // Get available resources
       const resourceNames = await robot.resourceNames();
       
       sensors = resourceNames.filter((r: any) => 
@@ -65,20 +59,40 @@
         r.type === 'component' && r.subtype === 'camera'
       );
       
-      console.log('Available sensors:', sensors.length);
-      console.log('Available cameras:', cameras.length);
+      console.log(`📊 Found ${sensors.length} sensors, 📷 ${cameras.length} cameras`);
       
     } catch (err: any) {
+      if (!mounted) return;
       error = err.message;
       console.error('Connection failed:', err);
     } finally {
-      loading = false;
+      if (mounted) {
+        loading = false;
+      }
     }
+  }
+  
+  onMount(() => {
+    mounted = true;
+    connectAndLoadResources();
+    
+    // Cleanup function
+    return () => {
+      mounted = false;
+      if (robot) {
+        console.log(`🔌 Disconnecting from: ${machineData?.machineName}`);
+        robot.disconnect();
+        robot = null;
+      }
+    };
   });
   
   onDestroy(() => {
+    mounted = false;
     if (robot) {
+      console.log('Cleanup: Disconnecting from machine');
       robot.disconnect();
+      robot = null;
     }
   });
 </script>
@@ -138,7 +152,7 @@
           </dl>
         </div>
         
-        <!-- Cameras -->
+        <!-- Cameras Section -->
         {#if cameras.length > 0}
           <div class="bg-white rounded-lg shadow p-6">
             <h2 class="text-lg font-medium mb-4">Cameras</h2>
@@ -150,7 +164,7 @@
           </div>
         {/if}
         
-        <!-- Sensors -->
+        <!-- Sensors Section -->
         {#if sensors.length > 0}
           <div class="bg-white rounded-lg shadow p-6">
             <h2 class="text-lg font-medium mb-4">Sensors</h2>
@@ -160,9 +174,9 @@
               {/each}
             </div>
           </div>
-        {:else}
+        {:else if cameras.length === 0}
           <div class="bg-white rounded-lg shadow p-6">
-            <p class="text-sm text-gray-500">No sensors available</p>
+            <p class="text-sm text-gray-500">No sensors or cameras available</p>
           </div>
         {/if}
       </div>
