@@ -36,6 +36,7 @@
 		"vite": "^7.0.4"
 	},
 	"dependencies": {
-		"@viamrobotics/sdk": "^0.51.0"
+		"@viamrobotics/sdk": "^0.51.0",
+		"typescript-cookie": "^1.0.6"
 	}
 }
