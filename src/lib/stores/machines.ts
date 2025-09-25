@@ -7,10 +7,12 @@ export const machines = writable<any[]>([]);
 export const accessToken = writable<string>('');
 
 const PRET_ORG_ID = 'cc36ba4b-8053-441e-84fa-136270d34584';
+const ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
 export async function initViam() {
   let token = '';
   
+  // Parse userToken cookie from Viam authentication
   const userToken = document.cookie
     .split('; ')
     .find(row => row.startsWith('userToken='));
@@ -20,6 +22,7 @@ export async function initViam() {
     token = JSON.parse(decoded).access_token;
   }
   
+  // Fallback to environment variable for local development
   if (!token && import.meta.env.VITE_VIAM_ACCESS_TOKEN) {
     token = import.meta.env.VITE_VIAM_ACCESS_TOKEN;
   }
@@ -48,9 +51,7 @@ export async function loadMachines() {
   const allMachines: any[] = [];
   
   locationSummaries.forEach((location: any) => {
-    console.log(`Location: ${location.locationName}`);
-    console.log(`  ID: ${location.locationId}`);
-    console.log(`  Machines: ${location.machineSummaries.length}`);
+    console.log(`📍 ${location.locationName} (${location.machineSummaries.length} machines)`);
     
     location.machineSummaries.forEach((machine: any) => {
       const enrichedMachine = {
@@ -59,12 +60,11 @@ export async function loadMachines() {
         locationId: location.locationId
       };
       allMachines.push(enrichedMachine);
-      
-      console.log(`    - ${machine.machineName} (${machine.machineId})`);
+      console.log(`   └─ ${machine.machineName}`);
     });
   });
   
-  console.log(`Total machines across all locations: ${allMachines.length}`);
+  console.log(`Total machines: ${allMachines.length}`);
   
   locations.set(locationSummaries);
   machines.set(allMachines);
@@ -81,7 +81,7 @@ export async function checkMachineStatus(machineId: string): Promise<boolean> {
   }
   
   const now = Date.now();
-  const fiveMinutesAgo = now - (5 * 60 * 1000);
+  const fiveMinutesAgo = now - ONLINE_THRESHOLD_MS;
   
   return machine.partSummaries.some((part: any) => {
     if (!part.lastOnline?.seconds) return false;
@@ -89,4 +89,29 @@ export async function checkMachineStatus(machineId: string): Promise<boolean> {
     const lastOnlineMs = Number(part.lastOnline.seconds) * 1000;
     return lastOnlineMs > fiveMinutesAgo;
   });
+}
+
+export async function connectToMachine(machineId: string, locationId: string, machineName: string): Promise<RobotClient> {
+  const token = get(accessToken);
+  const host = `${machineName.toLowerCase().replace(/\s+/g, '-')}-main.${locationId}.viam.cloud`;
+  
+  console.log(`🔌 Connecting to: ${host}`);
+  
+  const timeout = new Promise((_, reject) => 
+    setTimeout(() => reject(new Error('Connection timeout')), 10000)
+  );
+  
+  const connection = createRobotClient({
+    host,
+    credentials: { 
+      type: 'access-token', 
+      payload: token 
+    },
+    signalingAddress: 'https://app.viam.com:443'
+  });
+  
+  const robot = await Promise.race([connection, timeout]) as RobotClient;
+  console.log(`✅ Connected to: ${machineName}`);
+  
+  return robot;
 }
