@@ -7,15 +7,17 @@
   import { get } from 'svelte/store';
   import SensorDisplay from '$lib/components/SensorDisplay.svelte';
   import CameraDisplay from '$lib/components/CameraDisplay.svelte';
+  import TemperatureChart from '$lib/components/TemperatureChart.svelte';
   
-  let robot: RobotClient | null = null;
-  let loading = true;
-  let error = '';
-  let machineData: any = null;
-  let isOnline = false;
-  let sensors: any[] = [];
-  let cameras: any[] = [];
+  let robot: RobotClient | null = $state(null);
+  let loading = $state(true);
+  let error = $state('');
+  let machineData: any = $state(null);
+  let isOnline = $state(false);
+  let sensors: any[] = $state([]);
+  let cameras: any[] = $state([]);
   let mounted = true;
+  let expandedSensor: string | null = $state(null);
   
   async function connectAndLoadResources() {
     try {
@@ -50,9 +52,15 @@
       
       // Get available resources
       const resourceNames = await robot.resourceNames();
+
+      // Filter resources (test)
+      const DISPLAY_SENSORS = [
+        /^sensor-\d+$/,        // Temperatures
+        /^langer_fill/,        // Stock
+      ];
       
       sensors = resourceNames.filter((r: any) => 
-        r.type === 'component' && r.subtype === 'sensor'
+        r.type === 'component' && r.subtype === 'sensor' && DISPLAY_SENSORS.some(pattern => pattern.test(r.name))
       );
       
       cameras = resourceNames.filter((r: any) => 
@@ -170,8 +178,23 @@
             <h2 class="text-lg font-medium mb-4">Sensors</h2>
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {#each sensors as sensor}
-                <SensorDisplay {robot} sensorName={sensor.name} />
-              {/each}
+                <div>
+                    <SensorDisplay {robot} sensorName={sensor.name} />
+                    
+                    {#if sensor.name.match(/^sensor-\d+$/)}
+                    <button onclick={() => expandedSensor = expandedSensor === sensor.name ? null : sensor.name}
+                        class="w-full mt-2 text-xs text-blue-600 hover:text-blue-800 py-1">
+                        {expandedSensor === sensor.name ? 'Hide' : 'View'} History
+                    </button>
+                    
+                    {#if expandedSensor === sensor.name}
+                        <div class="mt-2">
+                        <TemperatureChart machineId={machineData.machineId} sensorName={sensor.name} hours={6} />
+                        </div>
+                    {/if}
+                    {/if}
+                </div>
+                {/each}
             </div>
           </div>
         {:else if cameras.length === 0}
