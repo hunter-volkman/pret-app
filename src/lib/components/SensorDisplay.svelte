@@ -2,34 +2,46 @@
 <script lang="ts">
   import { type RobotClient, SensorClient } from '@viamrobotics/sdk';
   import { onMount, onDestroy } from 'svelte';
+  import StockFillBar from './StockFillBar.svelte';
   
   let { robot, sensorName } = $props<{ robot: RobotClient; sensorName: string }>();
   let sensorData = $state<any>(null);
   let loading = $state(true);
   let error = $state('');
-  let interval: any;
+  let interval: NodeJS.Timeout | null = null;
+  let mounted = true;
   
   async function fetchSensorData() {
+    if (!mounted) return;
+    
     try {
       const sensor = new SensorClient(robot, sensorName);
       const readings = await sensor.getReadings();
+
+      if (!mounted) return;
+      
       sensorData = readings;
       error = '';
     } catch (err: any) {
-      error = err.message;
+      error = err.message || 'Failed to read sensor';
+      console.error(`Sensor error for ${sensorName}:`, err.message);
     } finally {
-      loading = false;
+      if (mounted) loading = false;
     }
   }
   
   onMount(() => {
     fetchSensorData();
-    // Refresh data
+    // Refresh every 10 seconds
     interval = setInterval(fetchSensorData, 10000);
   });
   
   onDestroy(() => {
-    if (interval) clearInterval(interval);
+    mounted = false;
+    if (interval) {
+        clearInterval(interval);
+        interval = null;
+    }
   });
 </script>
 
@@ -51,5 +63,7 @@
         </div>
       {/each}
     </div>
+    <!-- Stock fill bar: langer_fill sensor -->
+    <StockFillBar data={sensorData} sensorName={sensorName} />
   {/if}
 </div>
