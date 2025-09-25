@@ -1,18 +1,20 @@
 <!-- src/routes/machine/[id]/+page.svelte -->
 <script lang="ts">
   import { page } from '$app/stores';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { machines, accessToken, checkMachineStatus } from '$lib/stores/machines';
   import { createRobotClient, type RobotClient } from '@viamrobotics/sdk';
   import { get } from 'svelte/store';
   import SensorDisplay from '$lib/components/SensorDisplay.svelte';
+  import CameraDisplay from '$lib/components/CameraDisplay.svelte';
   
   let robot: RobotClient | null = null;
   let loading = true;
   let error = '';
   let machineData: any = null;
   let isOnline = false;
-  let resources: any[] = [];
+  let sensors: any[] = [];
+  let cameras: any[] = [];
   
   onMount(async () => {
     try {
@@ -53,13 +55,18 @@
       
       console.log('Connected to machine');
       
-      // Get available resources
       const resourceNames = await robot.resourceNames();
-      resources = resourceNames.filter((r: any) => 
+      
+      sensors = resourceNames.filter((r: any) => 
         r.type === 'component' && r.subtype === 'sensor'
       );
       
-      console.log('Available sensors:', resources);
+      cameras = resourceNames.filter((r: any) => 
+        r.type === 'component' && r.subtype === 'camera'
+      );
+      
+      console.log('Available sensors:', sensors.length);
+      console.log('Available cameras:', cameras.length);
       
     } catch (err: any) {
       error = err.message;
@@ -69,12 +76,10 @@
     }
   });
   
-  onMount(() => {
-    return () => {
-      if (robot) {
-        robot.disconnect();
-      }
-    };
+  onDestroy(() => {
+    if (robot) {
+      robot.disconnect();
+    }
   });
 </script>
 
@@ -133,13 +138,25 @@
           </dl>
         </div>
         
+        <!-- Cameras -->
+        {#if cameras.length > 0}
+          <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-medium mb-4">Cameras</h2>
+            <div class="grid gap-4 sm:grid-cols-2">
+              {#each cameras as camera}
+                <CameraDisplay {robot} cameraName={camera.name} />
+              {/each}
+            </div>
+          </div>
+        {/if}
+        
         <!-- Sensors -->
-        {#if resources.length > 0}
+        {#if sensors.length > 0}
           <div class="bg-white rounded-lg shadow p-6">
             <h2 class="text-lg font-medium mb-4">Sensors</h2>
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {#each resources as resource}
-                <SensorDisplay {robot} sensorName={resource.name} />
+              {#each sensors as sensor}
+                <SensorDisplay {robot} sensorName={sensor.name} />
               {/each}
             </div>
           </div>
