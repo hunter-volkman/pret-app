@@ -1,5 +1,7 @@
+// src/lib/stores/machines.ts
 import { writable, get } from 'svelte/store';
 import { createViamClient, createRobotClient, type ViamClient, type RobotClient } from '@viamrobotics/sdk';
+import { getCookie } from 'typescript-cookie';
 
 export const viamClient = writable<ViamClient | null>(null);
 export const locations = writable<any[]>([]);
@@ -11,13 +13,13 @@ const PRET_ORG_ID = 'cc36ba4b-8053-441e-84fa-136270d34584';
 export async function initViam() {
   let token = '';
   
-  const userToken = document.cookie
-    .split('; ')
-    .find(row => row.startsWith('userToken='));
-  
-  if (userToken) {
-    const decoded = decodeURIComponent(userToken.split('=')[1]);
-    token = JSON.parse(decoded).access_token;
+  const userTokenRaw = getCookie('userToken');
+  if (userTokenRaw) {
+    const startIndex = userTokenRaw.indexOf('{');
+    const endIndex = userTokenRaw.indexOf('}');
+    const jsonStr = userTokenRaw.slice(startIndex, endIndex + 1);
+    const userToken = JSON.parse(jsonStr);
+    token = userToken.access_token;
   }
   
   if (!token && import.meta.env.VITE_VIAM_ACCESS_TOKEN) {
